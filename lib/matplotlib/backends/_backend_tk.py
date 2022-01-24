@@ -14,7 +14,7 @@ import numpy as np
 from PIL import Image, ImageTk
 
 import matplotlib as mpl
-from matplotlib import _api, backend_tools, cbook, _c_internal_utils
+from matplotlib import _api, backend_tools, cbook, _c_internal_utils_hpy as _c_internal_utils
 from matplotlib.backend_bases import (
     _Backend, FigureCanvasBase, FigureManagerBase, NavigationToolbar2,
     TimerBase, ToolContainerBase, cursors, _Mode)

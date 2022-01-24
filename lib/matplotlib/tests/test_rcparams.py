@@ -9,7 +9,7 @@ from cycler import cycler, Cycler
 import pytest
 
 import matplotlib as mpl
-from matplotlib import _api, _c_internal_utils
+from matplotlib import _api, _c_internal_utils_hpy as _c_internal_utils
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np

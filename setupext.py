@@ -384,7 +384,7 @@ class Matplotlib(SetupPackage):
         yield ext
         # c_internal_utils
         ext = Extension(
-            "matplotlib._c_internal_utils", ["src/_c_internal_utils.c"],
+            "matplotlib._c_internal_utils_hpy", ["src/_c_internal_utils.c"],
             libraries=({
                 "linux": ["dl"],
                 "win32": ["ole32", "shell32", "user32"],

@@ -1,5 +1,4 @@
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>
 #ifdef __linux__
 #include <dlfcn.h>
 #endif
@@ -8,9 +7,10 @@
 #include <Shobjidl.h>
 #include <Windows.h>
 #endif
+#include "hpy.h"
 
-static PyObject*
-mpl_display_is_valid(PyObject* module)
+static HPy
+mpl_display_is_valid(HPyContext *ctx, HPy module)
 {
 #ifdef __linux__
     void* libX11;
@@ -28,11 +28,11 @@ mpl_display_is_valid(PyObject* module)
             XCloseDisplay(display);
         }
         if (dlclose(libX11)) {
-            PyErr_SetString(PyExc_RuntimeError, dlerror());
-            return NULL;
+            HPyErr_SetString(ctx, ctx->h_RuntimeError, dlerror());
+            return HPy_NULL;
         }
         if (display) {
-            Py_RETURN_TRUE;
+            return HPy_Dup(ctx, ctx->h_True);
         }
     }
     void* libwayland_client;
@@ -48,21 +48,22 @@ mpl_display_is_valid(PyObject* module)
             wl_display_disconnect(display);
         }
         if (dlclose(libwayland_client)) {
-            PyErr_SetString(PyExc_RuntimeError, dlerror());
-            return NULL;
+            HPyErr_SetString(ctx, ctx->h_RuntimeError, dlerror());
+            return HPy_NULL;
         }
         if (display) {
-            Py_RETURN_TRUE;
+            return HPy_Dup(ctx, ctx->h_True);
         }
     }
-    Py_RETURN_FALSE;
+    return HPy_Dup(ctx, ctx->h_False);
 #else
     Py_RETURN_TRUE;
 #endif
 }
 
-static PyObject*
-mpl_GetCurrentProcessExplicitAppUserModelID(PyObject* module)
+
+static HPy
+mpl_GetCurrentProcessExplicitAppUserModelID(HPyContext *ctx, HPy module)
 {
 #ifdef _WIN32
     wchar_t* appid = NULL;
@@ -70,74 +71,75 @@ mpl_GetCurrentProcessExplicitAppUserModelID(PyObject* module)
     if (FAILED(hr)) {
 #if defined(PYPY_VERSION_NUM) && PYPY_VERSION_NUM < 0x07030600
         /* Remove when we require PyPy 7.3.6 */
-        PyErr_SetFromWindowsErr(hr);
-        return NULL;
+        PyErr_SetFromWindowsErr(hr); // TODO: add to HPy
+        return HPy_NULL;
 #else
-        return PyErr_SetFromWindowsErr(hr);
+        // return PyErr_SetFromWindowsErr(hr); // TODO: add to HPy
+        return HPy_NULL;
 #endif
     }
-    PyObject* py_appid = PyUnicode_FromWideChar(appid, -1);
+    HPy py_appid = HPyUnicode_FromWideChar(ctx, appid, -1);
     CoTaskMemFree(appid);
     return py_appid;
 #else
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 #endif
 }
 
-static PyObject*
-mpl_SetCurrentProcessExplicitAppUserModelID(PyObject* module, PyObject* arg)
+static HPy
+mpl_SetCurrentProcessExplicitAppUserModelID(HPyContext *ctx, HPy module, HPy arg)
 {
 #ifdef _WIN32
-    wchar_t* appid = PyUnicode_AsWideCharString(arg, NULL);
+    wchar_t* appid = HPyUnicode_AsWideCharString(ctx, arg, NULL); // TODO: add to HPy
     if (!appid) {
-        return NULL;
+        return HPy_NULL;
     }
     HRESULT hr = SetCurrentProcessExplicitAppUserModelID(appid);
-    PyMem_Free(appid);
+    free(appid); // PyMem_Free is not in HPy
     if (FAILED(hr)) {
 #if defined(PYPY_VERSION_NUM) && PYPY_VERSION_NUM < 0x07030600
         /* Remove when we require PyPy 7.3.6 */
-        PyErr_SetFromWindowsErr(hr);
-        return NULL;
+        // PyErr_SetFromWindowsErr(hr); TODO: add to HPy
+        return HPy_NULL;
 #else
-        return PyErr_SetFromWindowsErr(hr);
+        // return PyErr_SetFromWindowsErr(hr); TODO: add to HPy
 #endif
     }
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 #else
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 #endif
 }
 
-static PyObject*
-mpl_GetForegroundWindow(PyObject* module)
+static HPy
+mpl_GetForegroundWindow(HPyContext *ctx, HPy module)
 {
 #ifdef _WIN32
-  return PyLong_FromVoidPtr(GetForegroundWindow());
+  return HPyLong_FromVoidPtr(GetForegroundWindow()); // TODO: add to HPy
 #else
-  Py_RETURN_NONE;
+  return HPy_Dup(ctx, ctx->h_None);
 #endif
 }
 
-static PyObject*
-mpl_SetForegroundWindow(PyObject* module, PyObject *arg)
+static HPy
+mpl_SetForegroundWindow(HPyContext *ctx, HPy module, HPy arg)
 {
 #ifdef _WIN32
-  HWND handle = PyLong_AsVoidPtr(arg);
-  if (PyErr_Occurred()) {
-    return NULL;
+  HWND handle = HPyLong_AsVoidPtr(ctx, arg);
+  if (HPyErr_Occurred(ctx)) {
+    return HPy_NULL;
   }
   if (!SetForegroundWindow(handle)) {
-    return PyErr_Format(PyExc_RuntimeError, "Error setting window");
+    return HPyErr_Format(ctx, ctx->h_RuntimeError, "Error setting window");
   }
-  Py_RETURN_NONE;
+  return HPy_Dup(ctx, ctx->h_None);
 #else
-  Py_RETURN_NONE;
+  return HPy_Dup(ctx, ctx->h_None);
 #endif
 }
 
-static PyObject*
-mpl_SetProcessDpiAwareness_max(PyObject* module)
+static HPy
+mpl_SetProcessDpiAwareness_max(HPyContext *ctx, HPy module)
 {
 #ifdef _WIN32
 #ifdef _DPI_AWARENESS_CONTEXTS_
@@ -174,48 +176,64 @@ mpl_SetProcessDpiAwareness_max(PyObject* module)
     SetProcessDPIAware();
 #endif
 #endif
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
-
-static PyMethodDef functions[] = {
-    {"display_is_valid", (PyCFunction)mpl_display_is_valid, METH_NOARGS,
-     "display_is_valid()\n--\n\n"
-     "Check whether the current X11 or Wayland display is valid.\n\n"
-     "On Linux, returns True if either $DISPLAY is set and XOpenDisplay(NULL)\n"
-     "succeeds, or $WAYLAND_DISPLAY is set and wl_display_connect(NULL)\n"
-     "succeeds.  On other platforms, always returns True."},
-    {"Win32_GetCurrentProcessExplicitAppUserModelID",
-     (PyCFunction)mpl_GetCurrentProcessExplicitAppUserModelID, METH_NOARGS,
-     "Win32_GetCurrentProcessExplicitAppUserModelID()\n--\n\n"
-     "Wrapper for Windows's GetCurrentProcessExplicitAppUserModelID.  On \n"
-     "non-Windows platforms, always returns None."},
-    {"Win32_SetCurrentProcessExplicitAppUserModelID",
-     (PyCFunction)mpl_SetCurrentProcessExplicitAppUserModelID, METH_O,
-     "Win32_SetCurrentProcessExplicitAppUserModelID(appid, /)\n--\n\n"
-     "Wrapper for Windows's SetCurrentProcessExplicitAppUserModelID.  On \n"
-     "non-Windows platforms, a no-op."},
-    {"Win32_GetForegroundWindow",
-     (PyCFunction)mpl_GetForegroundWindow, METH_NOARGS,
-     "Win32_GetForegroundWindow()\n--\n\n"
-     "Wrapper for Windows' GetForegroundWindow.  On non-Windows platforms, \n"
-     "always returns None."},
-    {"Win32_SetForegroundWindow",
-     (PyCFunction)mpl_SetForegroundWindow, METH_O,
-     "Win32_SetForegroundWindow(hwnd, /)\n--\n\n"
-     "Wrapper for Windows' SetForegroundWindow.  On non-Windows platforms, \n"
-     "a no-op."},
-    {"Win32_SetProcessDpiAwareness_max",
-     (PyCFunction)mpl_SetProcessDpiAwareness_max, METH_NOARGS,
-     "Win32_SetProcessDpiAwareness_max()\n--\n\n"
+HPyDef_METH(mpl_display_is_valid_def, "display_is_valid", mpl_display_is_valid, HPyFunc_NOARGS,
+    .doc = "display_is_valid()\n--\n\n"
+    "Check whether the current X11 or Wayland display is valid.\n\n"
+    "On Linux, returns True if either $DISPLAY is set and XOpenDisplay(NULL)\n"
+    "succeeds, or $WAYLAND_DISPLAY is set and wl_display_connect(NULL)\n"
+    "succeeds.  On other platforms, always returns True.");
+HPyDef_METH(mpl_GetCurrentProcessExplicitAppUserModelID_def, "Win32_GetCurrentProcessExplicitAppUserModelID",
+    mpl_GetCurrentProcessExplicitAppUserModelID, HPyFunc_NOARGS,
+    .doc = "Win32_GetCurrentProcessExplicitAppUserModelID()\n--\n\n"
+    "Wrapper for Windows's GetCurrentProcessExplicitAppUserModelID.  On \n"
+    "non-Windows platforms, always returns None.");
+HPyDef_METH(mpl_SetCurrentProcessExplicitAppUserModelID_def, "Win32_SetCurrentProcessExplicitAppUserModelID",
+    mpl_SetCurrentProcessExplicitAppUserModelID, HPyFunc_O,
+    .doc = "Win32_SetCurrentProcessExplicitAppUserModelID(appid, /)\n--\n\n"
+    "Wrapper for Windows's SetCurrentProcessExplicitAppUserModelID.  On \n"
+    "non-Windows platforms, a no-op.");
+HPyDef_METH(mpl_GetForegroundWindow_def, "Win32_GetForegroundWindow",
+    mpl_GetForegroundWindow, HPyFunc_NOARGS,
+    .doc = "Win32_GetForegroundWindow()\n--\n\n"
+    "Wrapper for Windows' GetForegroundWindow.  On non-Windows platforms, \n"
+    "always returns None.");
+HPyDef_METH(mpl_SetForegroundWindow_def, "Win32_SetForegroundWindow",
+    mpl_SetForegroundWindow, HPyFunc_O,
+    .doc = "Win32_SetForegroundWindow(hwnd, /)\n--\n\n"
+    "Wrapper for Windows' SetForegroundWindow.  On non-Windows platforms, \n"
+    "a no-op.");
+HPyDef_METH(mpl_SetProcessDpiAwareness_max_def, "Win32_SetProcessDpiAwareness_max",
+    mpl_SetProcessDpiAwareness_max, HPyFunc_NOARGS,
+    .doc = "Win32_SetProcessDpiAwareness_max()\n--\n\n"
      "Set Windows' process DPI awareness to best option available.\n"
-     "On non-Windows platforms, does nothing."},
-    {NULL, NULL}};  // sentinel.
-static PyModuleDef util_module = {
-    PyModuleDef_HEAD_INIT, "_c_internal_utils", NULL, 0, functions
+     "On non-Windows platforms, does nothing.");
+
+static HPyDef *module_defines[] = {
+    &mpl_display_is_valid_def,
+    &mpl_GetCurrentProcessExplicitAppUserModelID_def,
+    &mpl_SetCurrentProcessExplicitAppUserModelID_def,
+    &mpl_GetForegroundWindow_def,
+    &mpl_SetForegroundWindow_def,
+    &mpl_SetProcessDpiAwareness_max_def,
+    NULL
+};
+
+static HPyModuleDef util_module = {
+  .name = "_c_internal_utils_hpy",
+  .doc = 0,
+  .size = -1,
+  .defines = module_defines,
 };
 
 #pragma GCC visibility push(default)
-PyMODINIT_FUNC PyInit__c_internal_utils(void)
+HPy_MODINIT(_c_internal_utils_hpy)
+static HPy init__c_internal_utils_hpy_impl(HPyContext *ctx)
 {
-    return PyModule_Create(&util_module);
+  HPy module = HPyModule_Create(ctx, &util_module);
+  if (HPy_IsNull(module)) {
+      return HPy_NULL;
+  }
+  return module;
 }

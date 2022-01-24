@@ -28,7 +28,7 @@ import weakref
 import numpy as np
 
 import matplotlib
-from matplotlib import _api, _c_internal_utils
+from matplotlib import _api, _c_internal_utils_hpy as _c_internal_utils
 from matplotlib._api.deprecation import (
     MatplotlibDeprecationWarning, mplDeprecation)
 

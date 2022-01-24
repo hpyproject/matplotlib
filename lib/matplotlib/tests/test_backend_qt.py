@@ -14,7 +14,7 @@ import pytest
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib._pylab_helpers import Gcf
-from matplotlib import _c_internal_utils
+from matplotlib import _c_internal_utils_hpy as _c_internal_utils
 
 
 try:

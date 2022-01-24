@@ -13,7 +13,7 @@ import urllib.request
 import pytest
 
 import matplotlib as mpl
-from matplotlib import _c_internal_utils
+from matplotlib import _c_internal_utils_hpy as _c_internal_utils
 
 
 # Minimal smoke-testing of the backends for which the dependencies are
