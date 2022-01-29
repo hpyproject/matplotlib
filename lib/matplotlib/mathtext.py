@@ -26,7 +26,7 @@ from PIL import Image
 
 from matplotlib import (
     _api, colors as mcolors, rcParams, _mathtext, _mathtext_data)
-from matplotlib.ft2font import FT2Image, LOAD_NO_HINTING
+from matplotlib.ft2font_hpy import FT2Image, LOAD_NO_HINTING
 from matplotlib.font_manager import FontProperties
 
 _log = logging.getLogger(__name__)

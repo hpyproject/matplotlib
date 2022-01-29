@@ -17,7 +17,7 @@ extern "C" {
 }
 
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>
+#include "hpy.h"
 
 /*
  By definition, FT_FIXED as 2 16bit values stored in a single long.
@@ -75,11 +75,11 @@ class FT2Font
     void set_size(double ptsize, double dpi);
     void set_charmap(int i);
     void select_charmap(unsigned long i);
-    void set_text(
+    void set_text(HPyContext *ctx,
         size_t N, uint32_t *codepoints, double angle, FT_Int32 flags, std::vector<double> &xys);
     int get_kerning(FT_UInt left, FT_UInt right, FT_UInt mode);
     void set_kerning_factor(int factor);
-    void load_char(long charcode, FT_Int32 flags);
+    void load_char(HPyContext *ctx, long charcode, FT_Int32 flags);
     void load_glyph(FT_UInt glyph_index, FT_Int32 flags);
     void get_width_height(long *width, long *height);
     void get_bitmap_offset(long *x, long *y);
@@ -91,7 +91,7 @@ class FT2Font
     void draw_glyph_to_bitmap(FT2Image &im, int x, int y, size_t glyphInd, bool antialiased);
     void get_glyph_name(unsigned int glyph_number, char *buffer);
     long get_name_index(char *name);
-    PyObject* get_path();
+    HPy get_path(HPyContext *ctx);
 
     FT_Face &get_face()
     {

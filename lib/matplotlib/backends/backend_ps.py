@@ -28,7 +28,7 @@ from matplotlib.backend_bases import (
     GraphicsContextBase, RendererBase)
 from matplotlib.cbook import is_writable_file_like, file_requires_unicode
 from matplotlib.font_manager import get_font
-from matplotlib.ft2font import LOAD_NO_HINTING, LOAD_NO_SCALE, FT2Font
+from matplotlib.ft2font_hpy import LOAD_NO_HINTING, LOAD_NO_SCALE, FT2Font
 from matplotlib._ttconv import convert_ttf_to_ps
 from matplotlib.mathtext import MathTextParser
 from matplotlib._mathtext_data import uni2type1

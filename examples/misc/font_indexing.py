@@ -9,7 +9,7 @@ This example shows how the font tables relate to one another.
 import os
 
 import matplotlib
-from matplotlib.ft2font import (
+from matplotlib.ft2font_hpy import (
     FT2Font, KERNING_DEFAULT, KERNING_UNFITTED, KERNING_UNSCALED)
 
 

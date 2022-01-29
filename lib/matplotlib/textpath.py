@@ -7,7 +7,7 @@ import numpy as np
 
 from matplotlib import _text_helpers, dviread, font_manager
 from matplotlib.font_manager import FontProperties, get_font
-from matplotlib.ft2font import LOAD_NO_HINTING, LOAD_TARGET_LIGHT
+from matplotlib.ft2font_hpy import LOAD_NO_HINTING, LOAD_TARGET_LIGHT
 from matplotlib.mathtext import MathTextParser
 from matplotlib.path import Path
 from matplotlib.transforms import Affine2D

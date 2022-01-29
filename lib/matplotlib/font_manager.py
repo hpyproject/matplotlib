@@ -41,7 +41,7 @@ except ImportError:
     from dummy_threading import Timer
 
 import matplotlib as mpl
-from matplotlib import _api, afm, cbook, ft2font, rcParams
+from matplotlib import _api, afm, cbook, ft2font_hpy as ft2font, rcParams
 from matplotlib.fontconfig_pattern import (
     parse_fontconfig_pattern, generate_fontconfig_pattern)
 from matplotlib.rcsetup import _validators

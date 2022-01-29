@@ -11,7 +11,7 @@ object, as returned by `.load_char`.
 import os
 
 import matplotlib
-import matplotlib.ft2font as ft
+import matplotlib.ft2font_hpy as ft
 
 
 font = ft.FT2Font(

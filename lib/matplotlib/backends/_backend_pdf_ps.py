@@ -8,7 +8,7 @@ import functools
 from fontTools import subset
 
 import matplotlib as mpl
-from .. import font_manager, ft2font
+from .. import font_manager, ft2font_hpy as ft2font
 from ..afm import AFM
 from ..backend_bases import RendererBase
 

@@ -169,21 +169,35 @@ FT2Image::draw_rect_filled(unsigned long x0, unsigned long y0, unsigned long x1,
     m_dirty = true;
 }
 
-static FT_UInt ft_get_char_index_or_warn(FT_Face face, FT_ULong charcode)
+static FT_UInt ft_get_char_index_or_warn(HPyContext *ctx, FT_Face face, FT_ULong charcode)
 {
     FT_UInt glyph_index = FT_Get_Char_Index(face, charcode);
     if (glyph_index) {
         return glyph_index;
     }
-    PyObject *text_helpers = NULL, *tmp = NULL;
-    if (!(text_helpers = PyImport_ImportModule("matplotlib._text_helpers")) ||
-        !(tmp = PyObject_CallMethod(text_helpers, "warn_on_missing_glyph", "k", charcode))) {
+    HPy text_helpers = HPy_NULL, tmp = HPy_NULL;
+    HPy callable;
+    HPy tuple[1];
+    HPy h_tuple;
+    text_helpers = HPyImport_ImportModule(ctx, "matplotlib._text_helpers");
+    if (HPy_IsNull(text_helpers)) {
+        goto exit;
+    }
+    callable = HPy_GetAttr_s(ctx, text_helpers, "warn_on_missing_glyph");
+    tuple[0] = HPyLong_FromUnsignedLong(ctx, charcode);
+    h_tuple = HPyTuple_FromArray(ctx, tuple, 1);
+    tmp = HPy_CallTupleDict(ctx, callable, h_tuple, HPy_NULL);
+    HPy_Close(ctx, tuple[0]);
+    HPy_Close(ctx, h_tuple);
+    HPy_Close(ctx, callable);
+
+    if (HPy_IsNull(tmp)) {
         goto exit;
     }
 exit:
-    Py_XDECREF(text_helpers);
-    Py_XDECREF(tmp);
-    if (PyErr_Occurred()) {
+    HPy_Close(ctx, text_helpers);
+    HPy_Close(ctx, tmp);
+    if (HPyErr_Occurred(ctx)) {
         throw py::exception();
     }
     return 0;
@@ -277,27 +291,30 @@ static FT_Outline_Funcs ft_outline_funcs = {
     ft_outline_conic_to,
     ft_outline_cubic_to};
 
-PyObject*
-FT2Font::get_path()
+HPy
+FT2Font::get_path(HPyContext *ctx)
 {
     if (!face->glyph) {
-        PyErr_SetString(PyExc_RuntimeError, "No glyph loaded");
-        return NULL;
+        HPyErr_SetString(ctx, ctx->h_RuntimeError, "No glyph loaded");
+        return HPy_NULL;
     }
     ft_outline_decomposer decomposer = {};
-    if (FT_Error error =
-        FT_Outline_Decompose(
-          &face->glyph->outline, &ft_outline_funcs, &decomposer)) {
-        PyErr_Format(PyExc_RuntimeError,
-                     "FT_Outline_Decompose failed with error 0x%x", error);
-        return NULL;
+    FT_Error error = FT_Outline_Decompose(&face->glyph->outline, &ft_outline_funcs, &decomposer);
+    if (error) {
+        // PyErr_Format(PyExc_RuntimeError,
+        //              "FT_Outline_Decompose failed with error 0x%x", error);
+        HPyErr_SetString(ctx, ctx->h_RuntimeError,
+                     "FT_Outline_Decompose failed with error");
+        return HPy_NULL;
     }
     if (!decomposer.index) {  // Don't append CLOSEPOLY to null glyphs.
       npy_intp vertices_dims[2] = { 0, 2 };
       numpy::array_view<double, 2> vertices(vertices_dims);
       npy_intp codes_dims[1] = { 0 };
       numpy::array_view<unsigned char, 1> codes(codes_dims);
-      return Py_BuildValue("NN", vertices.pyobj(), codes.pyobj());
+      return HPy_BuildValue(ctx, "OO", 
+                                HPy_FromPyObject(ctx, vertices.pyobj()), 
+                                HPy_FromPyObject(ctx, codes.pyobj()));
     }
     npy_intp vertices_dims[2] = { decomposer.index + 1, 2 };
     numpy::array_view<double, 2> vertices(vertices_dims);
@@ -306,17 +323,18 @@ FT2Font::get_path()
     decomposer.index = 0;
     decomposer.vertices = vertices.data();
     decomposer.codes = codes.data();
-    if (FT_Error error =
-        FT_Outline_Decompose(
-          &face->glyph->outline, &ft_outline_funcs, &decomposer)) {
-        PyErr_Format(PyExc_RuntimeError,
-                     "FT_Outline_Decompose failed with error 0x%x", error);
-        return NULL;
+    error = FT_Outline_Decompose(&face->glyph->outline, &ft_outline_funcs, &decomposer);
+    if (error) {
+        // PyErr_Format(PyExc_RuntimeError,
+        //              "FT_Outline_Decompose failed with error 0x%x", error);
+        HPyErr_SetString(ctx, ctx->h_RuntimeError,
+                     "FT_Outline_Decompose failed with error");
+        return HPy_NULL;
     }
     *(decomposer.vertices++) = 0;
     *(decomposer.vertices++) = 0;
     *(decomposer.codes++) = CLOSEPOLY;
-    return Py_BuildValue("NN", vertices.pyobj(), codes.pyobj());
+    return HPy_BuildValue(ctx, "OO", HPy_FromPyObject(ctx, vertices.pyobj()), HPy_FromPyObject(ctx, codes.pyobj()));
 }
 
 FT2Font::FT2Font(FT_Open_Args &open_args, long hinting_factor_) : image(), face(NULL)
@@ -426,7 +444,7 @@ void FT2Font::set_kerning_factor(int factor)
     kerning_factor = factor;
 }
 
-void FT2Font::set_text(
+void FT2Font::set_text(HPyContext *ctx,
     size_t N, uint32_t *codepoints, double angle, FT_Int32 flags, std::vector<double> &xys)
 {
     FT_Matrix matrix; /* transformation matrix */
@@ -452,7 +470,7 @@ void FT2Font::set_text(
         FT_BBox glyph_bbox;
         FT_Pos last_advance;
 
-        glyph_index = ft_get_char_index_or_warn(face, codepoints[n]);
+        glyph_index = ft_get_char_index_or_warn(ctx, face, codepoints[n]);
 
         // retrieve kerning distance and move pen position
         if (use_kerning && previous && glyph_index) {
@@ -500,9 +518,9 @@ void FT2Font::set_text(
     }
 }
 
-void FT2Font::load_char(long charcode, FT_Int32 flags)
+void FT2Font::load_char(HPyContext *ctx, long charcode, FT_Int32 flags)
 {
-    FT_UInt glyph_index = ft_get_char_index_or_warn(face, (FT_ULong)charcode);
+    FT_UInt glyph_index = ft_get_char_index_or_warn(ctx, face, (FT_ULong)charcode);
     if (FT_Error error = FT_Load_Glyph(face, glyph_index, flags)) {
         throw_ft_error("Could not load charcode", error);
     }

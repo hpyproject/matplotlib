@@ -24,7 +24,7 @@ from ._mathtext_data import (
     tex2uni)
 from .afm import AFM
 from .font_manager import FontProperties, findfont, get_font
-from .ft2font import KERNING_DEFAULT
+from .ft2font_hpy import KERNING_DEFAULT
 
 
 ParserElement.enablePackrat()

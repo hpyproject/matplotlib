@@ -38,7 +38,7 @@ from matplotlib.backend_bases import (
     _Backend, _check_savefig_extra_args, FigureCanvasBase, FigureManagerBase,
     RendererBase)
 from matplotlib.font_manager import findfont, get_font
-from matplotlib.ft2font import (LOAD_FORCE_AUTOHINT, LOAD_NO_HINTING,
+from matplotlib.ft2font_hpy import (LOAD_FORCE_AUTOHINT, LOAD_NO_HINTING,
                                 LOAD_DEFAULT, LOAD_NO_AUTOHINT)
 from matplotlib.mathtext import MathTextParser
 from matplotlib.path import Path

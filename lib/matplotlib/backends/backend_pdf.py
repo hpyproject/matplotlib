@@ -37,7 +37,7 @@ from matplotlib.font_manager import findfont, get_font
 from matplotlib.afm import AFM
 import matplotlib.type1font as type1font
 import matplotlib.dviread as dviread
-from matplotlib.ft2font import (FIXED_WIDTH, ITALIC, LOAD_NO_SCALE,
+from matplotlib.ft2font_hpy import (FIXED_WIDTH, ITALIC, LOAD_NO_SCALE,
                                 LOAD_NO_HINTING, KERNING_UNFITTED, FT2Font)
 from matplotlib.mathtext import MathTextParser
 from matplotlib.transforms import Affine2D, BboxBase

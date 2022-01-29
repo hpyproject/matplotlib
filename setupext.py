@@ -402,7 +402,7 @@ class Matplotlib(SetupPackage):
         yield ext
         # ft2font
         ext = Extension(
-            "matplotlib.ft2font", [
+            "matplotlib.ft2font_hpy", [
                 "src/ft2font.cpp",
                 "src/ft2font_wrapper.cpp",
                 "src/py_converters.cpp",

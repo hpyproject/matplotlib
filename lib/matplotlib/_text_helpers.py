@@ -5,7 +5,7 @@ Low-level text helper utilities.
 import dataclasses
 
 from . import _api
-from .ft2font import KERNING_DEFAULT, LOAD_NO_HINTING
+from .ft2font_hpy import KERNING_DEFAULT, LOAD_NO_HINTING
 
 
 LayoutItem = dataclasses.make_dataclass(

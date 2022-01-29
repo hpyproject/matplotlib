@@ -190,7 +190,7 @@ def _check_versions():
 
     # Quickfix to ensure Microsoft Visual C++ redistributable
     # DLLs are loaded before importing kiwisolver
-    from . import ft2font
+    from . import ft2font_hpy as ft2font
 
     for modname, minver in [
             ("cycler", "0.10"),
@@ -1200,7 +1200,7 @@ def _init_tests():
     # tests.  This must match the value in `setupext.py`
     LOCAL_FREETYPE_VERSION = '2.6.1'
 
-    from matplotlib import ft2font
+    from matplotlib import ft2font_hpy as ft2font
     if (ft2font.__freetype_version__ != LOCAL_FREETYPE_VERSION or
             ft2font.__freetype_build_type__ != 'local'):
         _log.warning(

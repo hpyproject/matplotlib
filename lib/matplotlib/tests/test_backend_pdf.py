@@ -11,7 +11,7 @@ import pytest
 import matplotlib as mpl
 from matplotlib import dviread, pyplot as plt, checkdep_usetex, rcParams
 from matplotlib.cbook import _get_data_path
-from matplotlib.ft2font import FT2Font
+from matplotlib.ft2font_hpy import FT2Font
 from matplotlib.backends._backend_pdf_ps import get_glyphs_subset
 from matplotlib.backends.backend_pdf import PdfPages
 

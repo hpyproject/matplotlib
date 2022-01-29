@@ -19,7 +19,7 @@ from pathlib import Path
 import unicodedata
 
 import matplotlib.font_manager as fm
-from matplotlib.ft2font import FT2Font
+from matplotlib.ft2font_hpy import FT2Font
 import matplotlib.pyplot as plt
 
 
