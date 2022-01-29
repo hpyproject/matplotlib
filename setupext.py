@@ -373,7 +373,7 @@ class Matplotlib(SetupPackage):
     def get_extensions(self):
         # agg
         ext = Extension(
-            "matplotlib.backends._backend_agg", [
+            "matplotlib.backends._backend_agg_hpy", [
                 "src/py_converters.cpp",
                 "src/_backend_agg.cpp",
                 "src/_backend_agg_wrapper.cpp",
