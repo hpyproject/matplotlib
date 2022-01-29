@@ -50,9 +50,29 @@ const char* image_resample__doc__ =
 "    The radius of the kernel, if method is SINC, LANCZOS or BLACKMAN.\n"
 "    Default is 1.\n";
 
+static HPy HPyCall(HPyContext *ctx, HPy obj, const char *func_name, HPy argtuple, HPy kwds) {
+    if (!HPy_HasAttr_s(ctx, obj, func_name)) {
+        return HPy_NULL;
+    }
+    HPy func = HPy_GetAttr_s(ctx, obj, func_name);
+    if (HPy_IsNull(func)) {
+        return HPy_NULL;
+    }
+    if (!HPyCallable_Check(ctx, func)) {
+        HPy_Close(ctx, func);
+        return HPy_NULL;
+    }
+    HPy result = HPy_CallTupleDict(ctx, func, argtuple, kwds);
+    if (HPy_IsNull(result)) {
+        HPy_Close(ctx, func);
+        return HPy_NULL;
+    }
+    HPy_Close(ctx, func);
+    return result;
+}
 
 static PyArrayObject *
-_get_transform_mesh(PyObject *py_affine, npy_intp *dims)
+_get_transform_mesh(HPyContext *ctx, HPy py_affine, npy_intp *dims)
 {
     /* TODO: Could we get away with float, rather than double, arrays here? */
 
@@ -60,14 +80,16 @@ _get_transform_mesh(PyObject *py_affine, npy_intp *dims)
     every pixel in the output image to the input image.  This is used
     as a lookup table during the actual resampling. */
 
-    PyObject *py_inverse = NULL;
     npy_intp out_dims[3];
 
     out_dims[0] = dims[0] * dims[1];
     out_dims[1] = 2;
 
-    py_inverse = PyObject_CallMethod(py_affine, "inverted", NULL);
-    if (py_inverse == NULL) {
+    // HPy tuple[] = {py_affine};
+    // HPy argtuple = HPyTuple_FromArray(ctx, tuple, 1);
+    HPy py_inverse = HPyCall(ctx, py_affine, "inverted", HPy_NULL, HPy_NULL);
+    // HPy_Close(ctx, argtuple);
+    if (HPy_IsNull(py_inverse)) {
         return NULL;
     }
 
@@ -81,20 +103,24 @@ _get_transform_mesh(PyObject *py_affine, npy_intp *dims)
         }
     }
 
-    PyObject *output_mesh = PyObject_CallMethod(
-        py_inverse, "transform", "O", input_mesh.pyobj_steal());
+    HPy h_val = HPy_FromPyObject(ctx, input_mesh.pyobj_steal());
+    HPy tuple_transform[] = {h_val};
+    HPy argtuple_transform = HPyTuple_FromArray(ctx, tuple_transform, 1);
+    HPy output_mesh = HPyCall(ctx, py_inverse, "transform", argtuple_transform, HPy_NULL);
+    HPy_Close(ctx, h_val);
+    HPy_Close(ctx, argtuple_transform);
 
-    Py_DECREF(py_inverse);
+    HPy_Close(ctx, py_inverse);
 
-    if (output_mesh == NULL) {
+    if (HPy_IsNull(output_mesh)) {
         return NULL;
     }
 
     PyArrayObject *output_mesh_array =
         (PyArrayObject *)PyArray_ContiguousFromAny(
-            output_mesh, NPY_DOUBLE, 2, 2);
+            HPy_AsPyObject(ctx, output_mesh), NPY_DOUBLE, 2, 2);
 
-    Py_DECREF(output_mesh);
+    HPy_Close(ctx, output_mesh);
 
     if (output_mesh_array == NULL) {
         return NULL;
@@ -106,29 +132,31 @@ _get_transform_mesh(PyObject *py_affine, npy_intp *dims)
 
 template<class T>
 static void
-resample(PyArrayObject* input, PyArrayObject* output, resample_params_t params)
+resample(HPyContext *ctx, PyArrayObject* input, PyArrayObject* output, resample_params_t params)
 {
-    Py_BEGIN_ALLOW_THREADS
+    HPy_BEGIN_LEAVE_PYTHON(ctx);
     resample(
         (T*)PyArray_DATA(input), PyArray_DIM(input, 1), PyArray_DIM(input, 0),
         (T*)PyArray_DATA(output), PyArray_DIM(output, 1), PyArray_DIM(output, 0),
         params);
-    Py_END_ALLOW_THREADS
+    HPy_END_LEAVE_PYTHON(ctx);
 }
 
 
-static PyObject *
-image_resample(PyObject *self, PyObject* args, PyObject *kwargs)
+static HPy
+image_resample(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwargs)
 {
-    PyObject *py_input_array = NULL;
-    PyObject *py_output_array = NULL;
-    PyObject *py_transform = NULL;
+    HPy py_input_array = HPy_NULL;
+    HPy py_output_array = HPy_NULL;
+    HPy py_transform = HPy_NULL;
     resample_params_t params;
 
     PyArrayObject *input_array = NULL;
     PyArrayObject *output_array = NULL;
     PyArrayObject *transform_mesh_array = NULL;
 
+    HPy h_resample = HPy_NULL;
+    HPy h_norm = HPy_NULL;
     params.interpolation = NEAREST;
     params.transform_mesh = NULL;
     params.resample = false;
@@ -140,63 +168,75 @@ image_resample(PyObject *self, PyObject* args, PyObject *kwargs)
         "input_array", "output_array", "transform", "interpolation",
         "resample", "alpha", "norm", "radius", NULL };
 
-    if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "OOO|iO&dO&d:resample", (char **)kwlist,
-            &py_input_array, &py_output_array, &py_transform,
-            &params.interpolation, &convert_bool, &params.resample,
-            &params.alpha, &convert_bool, &params.norm, &params.radius)) {
-        return NULL;
+    HPyTracker ht;
+    if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
+            kwargs, 
+            "OOO|iOdOd:resample", 
+            (const char **)kwlist,
+            &py_input_array, 
+            &py_output_array, 
+            &py_transform,
+            &params.interpolation, 
+            &h_resample,
+            &params.alpha, 
+            &h_norm, 
+            &params.radius)) {
+        goto error;
+    }
+
+    if ((!HPy_IsNull(h_resample) && !convert_bool_hpy(ctx, h_resample, &params.resample)) || 
+            (!HPy_IsNull(h_norm) && !convert_bool_hpy(ctx, h_norm, &params.norm))) {
+        goto error;
     }
 
     if (params.interpolation < 0 || params.interpolation >= _n_interpolation) {
-        PyErr_Format(PyExc_ValueError, "invalid interpolation value %d",
-                     params.interpolation);
+        // PyErr_Format(PyExc_ValueError, "invalid interpolation value %d",
+        //              params.interpolation);
+        HPyErr_SetString(ctx, ctx->h_ValueError, "invalid interpolation value");
         goto error;
     }
 
     input_array = (PyArrayObject *)PyArray_FromAny(
-        py_input_array, NULL, 2, 3, NPY_ARRAY_C_CONTIGUOUS, NULL);
+        HPy_AsPyObject(ctx, py_input_array), NULL, 2, 3, NPY_ARRAY_C_CONTIGUOUS, NULL);
     if (input_array == NULL) {
         goto error;
     }
 
-    if (!PyArray_Check(py_output_array)) {
-        PyErr_SetString(PyExc_ValueError, "output array must be a NumPy array");
+    output_array = (PyArrayObject *)HPy_AsPyObject(ctx, py_output_array);
+    if (!PyArray_Check(output_array)) {
+        HPyErr_SetString(ctx, ctx->h_ValueError, "output array must be a NumPy array");
         goto error;
     }
-    output_array = (PyArrayObject *)py_output_array;
     if (!PyArray_IS_C_CONTIGUOUS(output_array)) {
-        PyErr_SetString(PyExc_ValueError, "output array must be C-contiguous");
+        HPyErr_SetString(ctx, ctx->h_ValueError, "output array must be C-contiguous");
         goto error;
     }
     if (PyArray_NDIM(output_array) < 2 || PyArray_NDIM(output_array) > 3) {
-        PyErr_SetString(PyExc_ValueError,
+        HPyErr_SetString(ctx, ctx->h_ValueError,
                         "output array must be 2- or 3-dimensional");
         goto error;
     }
 
-    if (py_transform == NULL || py_transform == Py_None) {
+    if (HPy_IsNull(py_transform) || HPy_Is(ctx, py_transform, ctx->h_None)) {
         params.is_affine = true;
     } else {
-        PyObject *py_is_affine;
-        int py_is_affine2;
-        py_is_affine = PyObject_GetAttrString(py_transform, "is_affine");
-        if (py_is_affine == NULL) {
+        HPy py_is_affine = HPy_GetAttr_s(ctx, py_transform, "is_affine");
+        if (HPy_IsNull(py_is_affine)) {
             goto error;
         }
 
-        py_is_affine2 = PyObject_IsTrue(py_is_affine);
-        Py_DECREF(py_is_affine);
+        int py_is_affine2 = HPy_IsTrue(ctx, py_is_affine);
+        HPy_Close(ctx, py_is_affine);
 
         if (py_is_affine2 == -1) {
             goto error;
         } else if (py_is_affine2) {
-            if (!convert_trans_affine(py_transform, &params.affine)) {
+            if (!convert_trans_affine_hpy(ctx, py_transform, &params.affine)) {
                 goto error;
             }
             params.is_affine = true;
         } else {
-            transform_mesh_array = _get_transform_mesh(
+            transform_mesh_array = _get_transform_mesh(ctx,
                 py_transform, PyArray_DIMS(output_array));
             if (transform_mesh_array == NULL) {
                 goto error;
@@ -207,22 +247,23 @@ image_resample(PyObject *self, PyObject* args, PyObject *kwargs)
     }
 
     if (PyArray_NDIM(input_array) != PyArray_NDIM(output_array)) {
-        PyErr_Format(
-            PyExc_ValueError,
-            "Mismatched number of dimensions. Got %d and %d.",
-            PyArray_NDIM(input_array), PyArray_NDIM(output_array));
+        // PyErr_Format(
+        //     PyExc_ValueError,
+        //     "Mismatched number of dimensions. Got %d and %d.",
+        //     PyArray_NDIM(input_array), PyArray_NDIM(output_array));
+        HPyErr_SetString(ctx, ctx->h_ValueError,
+            "Mismatched number of dimensions.");
         goto error;
     }
 
     if (PyArray_TYPE(input_array) != PyArray_TYPE(output_array)) {
-        PyErr_SetString(PyExc_ValueError, "Mismatched types");
+        HPyErr_SetString(ctx, ctx->h_ValueError, "Mismatched types");
         goto error;
     }
 
     if (PyArray_NDIM(input_array) == 3) {
         if (PyArray_DIM(output_array, 2) != 4) {
-            PyErr_SetString(
-                PyExc_ValueError,
+            HPyErr_SetString(ctx, ctx->h_ValueError,
                 "Output array must be RGBA");
             goto error;
         }
@@ -231,110 +272,153 @@ image_resample(PyObject *self, PyObject* args, PyObject *kwargs)
             switch (PyArray_TYPE(input_array)) {
             case NPY_UINT8:
             case NPY_INT8:
-                resample<agg::rgba8>(input_array, output_array, params);
+                resample<agg::rgba8>(ctx, input_array, output_array, params);
                 break;
             case NPY_UINT16:
             case NPY_INT16:
-                resample<agg::rgba16>(input_array, output_array, params);
+                resample<agg::rgba16>(ctx, input_array, output_array, params);
                 break;
             case NPY_FLOAT32:
-                resample<agg::rgba32>(input_array, output_array, params);
+                resample<agg::rgba32>(ctx, input_array, output_array, params);
                 break;
             case NPY_FLOAT64:
-                resample<agg::rgba64>(input_array, output_array, params);
+                resample<agg::rgba64>(ctx, input_array, output_array, params);
                 break;
             default:
-                PyErr_SetString(
-                    PyExc_ValueError,
+                HPyErr_SetString(ctx, ctx->h_ValueError,
                     "3-dimensional arrays must be of dtype unsigned byte, "
                     "unsigned short, float32 or float64");
                 goto error;
             }
         } else {
-            PyErr_Format(
-                PyExc_ValueError,
-                "If 3-dimensional, array must be RGBA.  Got %" NPY_INTP_FMT " planes.",
-                PyArray_DIM(input_array, 2));
+            // PyErr_Format(
+            //     PyExc_ValueError,
+            //     "If 3-dimensional, array must be RGBA.  Got %" NPY_INTP_FMT " planes.",
+            //     PyArray_DIM(input_array, 2));
+            HPyErr_SetString(ctx, ctx->h_ValueError,
+                "If 3-dimensional, array must be RGBA.");
             goto error;
         }
     } else { // NDIM == 2
         switch (PyArray_TYPE(input_array)) {
         case NPY_DOUBLE:
-            resample<double>(input_array, output_array, params);
+            resample<double>(ctx, input_array, output_array, params);
             break;
         case NPY_FLOAT:
-            resample<float>(input_array, output_array, params);
+            resample<float>(ctx, input_array, output_array, params);
             break;
         case NPY_UINT8:
         case NPY_INT8:
-            resample<unsigned char>(input_array, output_array, params);
+            resample<unsigned char>(ctx, input_array, output_array, params);
             break;
         case NPY_UINT16:
         case NPY_INT16:
-            resample<unsigned short>(input_array, output_array, params);
+            resample<unsigned short>(ctx, input_array, output_array, params);
             break;
         default:
-            PyErr_SetString(PyExc_ValueError, "Unsupported dtype");
+            HPyErr_SetString(ctx, ctx->h_ValueError, "Unsupported dtype");
             goto error;
         }
     }
 
     Py_DECREF(input_array);
     Py_XDECREF(transform_mesh_array);
-    Py_RETURN_NONE;
+    HPyTracker_Close(ctx, ht);
+    return HPy_Dup(ctx, ctx->h_None);
 
  error:
     Py_XDECREF(input_array);
     Py_XDECREF(transform_mesh_array);
-    return NULL;
+    HPyTracker_Close(ctx, ht);
+    return HPy_NULL;
 }
 
-static PyMethodDef module_functions[] = {
-    {"resample", (PyCFunction)image_resample, METH_VARARGS|METH_KEYWORDS, image_resample__doc__},
-    {NULL}
+HPyDef_METH(image_resample_def, "resample", image_resample, HPyFunc_KEYWORDS, .doc =image_resample__doc__)
+
+static HPyDef *module_defines[] = {
+    &image_resample_def,
+    NULL
 };
 
-static struct PyModuleDef moduledef = {
-    PyModuleDef_HEAD_INIT, "_image", NULL, 0, module_functions,
+static HPyModuleDef moduledef = {
+    .name = "_image_hpy",
+    .doc = NULL,
+    .size = 0,
+    .defines = module_defines,
 };
+
+int add_dict_int(HPyContext *ctx, HPy dict, const char *key, long val)
+{
+    HPy valobj = HPyLong_FromLong(ctx, val);
+    if (HPy_IsNull(valobj)) {
+        return 1;
+    }
+
+    if (HPy_SetAttr_s(ctx, dict, key, valobj)) {
+        HPy_Close(ctx, valobj);
+        return 1;
+    }
+
+    HPy_Close(ctx, valobj);
+    return 0;
+}
+
+
+// Logic is from NumPy's import_array()
+static int npy_import_array_hpy(HPyContext *ctx) {
+    if (_import_array() < 0) {
+        // HPyErr_Print(ctx); TODO
+        HPyErr_SetString(ctx, ctx->h_ImportError, "numpy.core.multiarray failed to import"); 
+        return 0; 
+    }
+    return 1;
+}
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #pragma GCC visibility push(default)
 
-PyMODINIT_FUNC PyInit__image(void)
+HPy_MODINIT(_image_hpy)
+static HPy init__image_hpy_impl(HPyContext *ctx)
 {
-    PyObject *m;
-
-    import_array();
-
-    m = PyModule_Create(&moduledef);
-
-    if (m == NULL) {
-        return NULL;
+    if (!npy_import_array_hpy(ctx)) {
+        return HPy_NULL;
     }
 
-    if (PyModule_AddIntConstant(m, "NEAREST", NEAREST) ||
-        PyModule_AddIntConstant(m, "BILINEAR", BILINEAR) ||
-        PyModule_AddIntConstant(m, "BICUBIC", BICUBIC) ||
-        PyModule_AddIntConstant(m, "SPLINE16", SPLINE16) ||
-        PyModule_AddIntConstant(m, "SPLINE36", SPLINE36) ||
-        PyModule_AddIntConstant(m, "HANNING", HANNING) ||
-        PyModule_AddIntConstant(m, "HAMMING", HAMMING) ||
-        PyModule_AddIntConstant(m, "HERMITE", HERMITE) ||
-        PyModule_AddIntConstant(m, "KAISER", KAISER) ||
-        PyModule_AddIntConstant(m, "QUADRIC", QUADRIC) ||
-        PyModule_AddIntConstant(m, "CATROM", CATROM) ||
-        PyModule_AddIntConstant(m, "GAUSSIAN", GAUSSIAN) ||
-        PyModule_AddIntConstant(m, "BESSEL", BESSEL) ||
-        PyModule_AddIntConstant(m, "MITCHELL", MITCHELL) ||
-        PyModule_AddIntConstant(m, "SINC", SINC) ||
-        PyModule_AddIntConstant(m, "LANCZOS", LANCZOS) ||
-        PyModule_AddIntConstant(m, "BLACKMAN", BLACKMAN) ||
-        PyModule_AddIntConstant(m, "_n_interpolation", _n_interpolation)) {
-        Py_DECREF(m);
-        return NULL;
+    HPy m = HPyModule_Create(ctx, &moduledef);
+    if (HPy_IsNull(m)) {
+        return HPy_NULL;
+    }
+
+    if (add_dict_int(ctx, m, "NEAREST", NEAREST) ||
+        add_dict_int(ctx, m, "BILINEAR", BILINEAR) ||
+        add_dict_int(ctx, m, "BICUBIC", BICUBIC) ||
+        add_dict_int(ctx, m, "SPLINE16", SPLINE16) ||
+        add_dict_int(ctx, m, "SPLINE36", SPLINE36) ||
+        add_dict_int(ctx, m, "HANNING", HANNING) ||
+        add_dict_int(ctx, m, "HAMMING", HAMMING) ||
+        add_dict_int(ctx, m, "HERMITE", HERMITE) ||
+        add_dict_int(ctx, m, "KAISER", KAISER) ||
+        add_dict_int(ctx, m, "QUADRIC", QUADRIC) ||
+        add_dict_int(ctx, m, "CATROM", CATROM) ||
+        add_dict_int(ctx, m, "GAUSSIAN", GAUSSIAN) ||
+        add_dict_int(ctx, m, "BESSEL", BESSEL) ||
+        add_dict_int(ctx, m, "MITCHELL", MITCHELL) ||
+        add_dict_int(ctx, m, "SINC", SINC) ||
+        add_dict_int(ctx, m, "LANCZOS", LANCZOS) ||
+        add_dict_int(ctx, m, "BLACKMAN", BLACKMAN) ||
+        add_dict_int(ctx, m, "_n_interpolation", _n_interpolation)) {
+        return HPy_NULL;
+
     }
 
     return m;
 }
 
 #pragma GCC visibility pop
+
+#ifdef __cplusplus
+}
+#endif

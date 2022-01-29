@@ -19,10 +19,10 @@ import matplotlib.colors as mcolors
 import matplotlib.cm as cm
 import matplotlib.cbook as cbook
 # For clarity, names from _image are given explicitly in this module:
-import matplotlib._image as _image
+import matplotlib._image_hpy as _image
 # For user convenience, the names from _image are also imported into
 # the image namespace:
-from matplotlib._image import *
+from matplotlib._image_hpy import *
 from matplotlib.transforms import (
     Affine2D, BboxBase, Bbox, BboxTransform, BboxTransformTo,
     IdentityTransform, TransformedBbox)
