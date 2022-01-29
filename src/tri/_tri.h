@@ -71,6 +71,7 @@
 #include <set>
 #include <vector>
 
+#include "hpy.h"
 
 
 /* An edge of a triangle consisting of an triangle index in the range 0 to
@@ -342,7 +343,7 @@ public:
      * Returns new python list [segs0, segs1, ...] where
      *   segs0: double array of shape (?,2) of point coordinates of first
      *   contour line, etc. */
-    PyObject* create_contour(const double& level);
+    HPy create_contour(HPyContext *ctx, const double& level);
 
     /* Create and return a filled contour.
      *   lower_level: Lower contour level.
@@ -350,7 +351,7 @@ public:
      * Returns new python tuple (segs, kinds) where
      *   segs: double array of shape (n_points,2) of all point coordinates,
      *   kinds: ubyte array of shape (n_points) of all point code types. */
-    PyObject* create_filled_contour(const double& lower_level,
+    HPy create_filled_contour(HPyContext *ctx, const double& lower_level,
                                     const double& upper_level);
 
 private:
@@ -369,13 +370,13 @@ private:
      *   contour line, etc.
      *   kinds0: ubyte array of shape (n_points) of kinds codes of first contour
      *   line, etc. */
-    PyObject* contour_line_to_segs_and_kinds(const Contour& contour);
+    HPy contour_line_to_segs_and_kinds(HPyContext *ctx, const Contour& contour);
 
     /* Convert a filled Contour from C++ to Python.
      * Returns new python tuple ([segs], [kinds]) where
      *   segs: double array of shape (n_points,2) of all point coordinates,
      *   kinds: ubyte array of shape (n_points) of all point code types. */
-    PyObject* contour_to_segs_and_kinds(const Contour& contour);
+    HPy contour_to_segs_and_kinds(HPyContext *ctx, const Contour& contour);
 
     /* Return the point on the specified TriEdge that intersects the specified
      * level. */
@@ -533,7 +534,7 @@ public:
      *          comparisons needed to search through the tree)
      *   6: mean of all trapezoid depths (one more than the average number of
      *          comparisons needed to search through the tree) */
-    PyObject* get_tree_stats();
+    HPy get_tree_stats(HPyContext *ctx);
 
     /* Initialize this object before use.  May be called multiple times, if,
      * for example, the triangulation is changed by setting the mask. */

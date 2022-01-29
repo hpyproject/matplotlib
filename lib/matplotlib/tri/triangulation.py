@@ -105,7 +105,7 @@ class Triangulation:
         Return the underlying C++ Triangulation object, creating it
         if necessary.
         """
-        from matplotlib import _tri
+        from matplotlib import _tri_hpy as _tri
         if self._cpp_triangulation is None:
             self._cpp_triangulation = _tri.Triangulation(
                 self.x, self.y, self.triangles, self.mask, self._edges,

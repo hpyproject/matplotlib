@@ -35,7 +35,7 @@ class TrapezoidMapTriFinder(TriFinder):
     """
 
     def __init__(self, triangulation):
-        from matplotlib import _tri
+        from matplotlib import _tri_hpy as _tri
         super().__init__(triangulation)
         self._cpp_trifinder = _tri.TrapezoidMapTriFinder(
             triangulation.get_cpp_triangulation())

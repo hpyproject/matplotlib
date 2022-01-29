@@ -35,7 +35,7 @@ def test_lazy_imports():
     import matplotlib.backend_bases
     import matplotlib.pyplot
 
-    assert 'matplotlib._tri' not in sys.modules
+    assert 'matplotlib._tri_hpy' not in sys.modules
     assert 'matplotlib._qhull_hpy' not in sys.modules
     assert 'matplotlib._contour_hpy' not in sys.modules
     assert 'urllib.request' not in sys.modules

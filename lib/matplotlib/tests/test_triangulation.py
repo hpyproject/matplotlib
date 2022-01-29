@@ -1049,43 +1049,43 @@ def test_tricontourf_decreasing_levels():
 
 def test_internal_cpp_api():
     # Following github issue 8197.
-    from matplotlib import _tri  # noqa: ensure lazy-loaded module *is* loaded.
+    from matplotlib import _tri_hpy as _tri  # noqa: ensure lazy-loaded module *is* loaded.
 
     # C++ Triangulation.
     with pytest.raises(
             TypeError,
-            match=r'function takes exactly 7 arguments \(0 given\)'):
-        mpl._tri.Triangulation()
+            match=r'function required positional argument missing'):
+        mpl._tri_hpy.Triangulation()
 
     with pytest.raises(
             ValueError, match=r'x and y must be 1D arrays of the same length'):
-        mpl._tri.Triangulation([], [1], [[]], None, None, None, False)
+        mpl._tri_hpy.Triangulation([], [1], [[]], None, None, None, False)
 
     x = [0, 1, 1]
     y = [0, 0, 1]
     with pytest.raises(
             ValueError,
             match=r'triangles must be a 2D array of shape \(\?,3\)'):
-        mpl._tri.Triangulation(x, y, [[0, 1]], None, None, None, False)
+        mpl._tri_hpy.Triangulation(x, y, [[0, 1]], None, None, None, False)
 
     tris = [[0, 1, 2]]
     with pytest.raises(
             ValueError,
             match=r'mask must be a 1D array with the same length as the '
                   r'triangles array'):
-        mpl._tri.Triangulation(x, y, tris, [0, 1], None, None, False)
+        mpl._tri_hpy.Triangulation(x, y, tris, [0, 1], None, None, False)
 
     with pytest.raises(
             ValueError, match=r'edges must be a 2D array with shape \(\?,2\)'):
-        mpl._tri.Triangulation(x, y, tris, None, [[1]], None, False)
+        mpl._tri_hpy.Triangulation(x, y, tris, None, [[1]], None, False)
 
     with pytest.raises(
             ValueError,
             match=r'neighbors must be a 2D array with the same shape as the '
                   r'triangles array'):
-        mpl._tri.Triangulation(x, y, tris, None, None, [[-1]], False)
+        mpl._tri_hpy.Triangulation(x, y, tris, None, None, [[-1]], False)
 
-    triang = mpl._tri.Triangulation(x, y, tris, None, None, None, False)
+    triang = mpl._tri_hpy.Triangulation(x, y, tris, None, None, None, False)
 
     with pytest.raises(
             ValueError,
@@ -1102,17 +1102,17 @@ def test_internal_cpp_api():
     # C++ TriContourGenerator.
     with pytest.raises(
             TypeError,
-            match=r'function takes exactly 2 arguments \(0 given\)'):
-        mpl._tri.TriContourGenerator()
+            match=r'function required positional argument missing'):
+        mpl._tri_hpy.TriContourGenerator()
 
     with pytest.raises(
             ValueError,
             match=r'z must be a 1D array with the same length as the x and y '
                   r'arrays'):
-        mpl._tri.TriContourGenerator(triang, [1])
+        mpl._tri_hpy.TriContourGenerator(triang, [1])
 
     z = [0, 1, 2]
-    tcg = mpl._tri.TriContourGenerator(triang, z)
+    tcg = mpl._tri_hpy.TriContourGenerator(triang, z)
 
     with pytest.raises(
             ValueError, match=r'filled contour levels must be increasing'):
@@ -1120,10 +1120,10 @@ def test_internal_cpp_api():
 
     # C++ TrapezoidMapTriFinder.
     with pytest.raises(
-            TypeError, match=r'function takes exactly 1 argument \(0 given\)'):
-        mpl._tri.TrapezoidMapTriFinder()
+            TypeError, match=r'function required positional argument missing'):
+        mpl._tri_hpy.TrapezoidMapTriFinder()
 
-    trifinder = mpl._tri.TrapezoidMapTriFinder(triang)
+    trifinder = mpl._tri_hpy.TrapezoidMapTriFinder(triang)
 
     with pytest.raises(
             ValueError, match=r'x and y must be array-like with same shape'):

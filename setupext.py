@@ -451,7 +451,7 @@ class Matplotlib(SetupPackage):
         yield ext
         # tri
         ext = Extension(
-            "matplotlib._tri", [
+            "matplotlib._tri_hpy", [
                 "src/tri/_tri.cpp",
                 "src/tri/_tri_wrapper.cpp",
             ])
