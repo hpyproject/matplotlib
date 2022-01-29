@@ -43,7 +43,7 @@ from matplotlib.mathtext import MathTextParser
 from matplotlib.transforms import Affine2D, BboxBase
 from matplotlib.path import Path
 from matplotlib.dates import UTC
-from matplotlib import _path
+from matplotlib import _path_hpy as _path
 from . import _backend_pdf_ps
 
 _log = logging.getLogger(__name__)

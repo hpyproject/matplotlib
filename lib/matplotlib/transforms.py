@@ -43,7 +43,7 @@ import numpy as np
 from numpy.linalg import inv
 
 from matplotlib import _api
-from matplotlib._path import (
+from matplotlib._path_hpy import (
     affine_transform, count_bboxes_overlapping_bbox, update_path_extents)
 from .path import Path
 

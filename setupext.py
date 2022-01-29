@@ -422,7 +422,7 @@ class Matplotlib(SetupPackage):
         yield ext
         # path
         ext = Extension(
-            "matplotlib._path", [
+            "matplotlib._path_hpy", [
                 "src/py_converters.cpp",
                 "src/_path_wrapper.cpp",
             ])

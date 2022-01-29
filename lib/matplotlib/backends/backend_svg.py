@@ -23,7 +23,7 @@ from matplotlib.colors import rgb2hex
 from matplotlib.dates import UTC
 from matplotlib.mathtext import MathTextParser
 from matplotlib.path import Path
-from matplotlib import _path
+from matplotlib import _path_hpy as _path
 from matplotlib.transforms import Affine2D, Affine2DBase
 
 _log = logging.getLogger(__name__)

@@ -21,7 +21,7 @@ import time
 import numpy as np
 
 import matplotlib as mpl
-from matplotlib import _api, cbook, _path, _text_helpers
+from matplotlib import _api, cbook, _path_hpy as _path, _text_helpers
 from matplotlib.afm import AFM
 from matplotlib.backend_bases import (
     _Backend, _check_savefig_extra_args, FigureCanvasBase, FigureManagerBase,

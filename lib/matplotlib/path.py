@@ -16,7 +16,7 @@ from weakref import WeakValueDictionary
 import numpy as np
 
 import matplotlib as mpl
-from . import _api, _path
+from . import _api, _path_hpy as _path
 from .cbook import _to_unmasked_float_array, simple_linear_interpolation
 from .bezier import BezierSegment
 
