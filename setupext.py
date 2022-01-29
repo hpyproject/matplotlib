@@ -459,7 +459,7 @@ class Matplotlib(SetupPackage):
         yield ext
         # ttconv
         ext = Extension(
-            "matplotlib._ttconv", [
+            "matplotlib._ttconv_hpy", [
                 "src/_ttconv.cpp",
                 "extern/ttconv/pprdrv_tt.cpp",
                 "extern/ttconv/pprdrv_tt2.cpp",
