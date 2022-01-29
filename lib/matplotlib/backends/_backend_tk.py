@@ -21,7 +21,7 @@ from matplotlib.backend_bases import (
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.figure import Figure
 from matplotlib.widgets import SubplotTool
-from . import _tkagg
+from . import _tkagg_hpy as _tkagg
 
 
 _log = logging.getLogger(__name__)

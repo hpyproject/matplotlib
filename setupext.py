@@ -438,7 +438,7 @@ class Matplotlib(SetupPackage):
         yield ext
         # tkagg
         ext = Extension(
-            "matplotlib.backends._tkagg", [
+            "matplotlib.backends._tkagg_hpy", [
                 "src/_tkagg.cpp",
             ],
             include_dirs=["src"],

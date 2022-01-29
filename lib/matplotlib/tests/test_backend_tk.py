@@ -64,7 +64,7 @@ def _isolated_tk_test(success_count, func=None):
 def test_blit():  # pragma: no cover
     import matplotlib.pyplot as plt
     import numpy as np
-    from matplotlib.backends import _tkagg
+    from matplotlib.backends import _tkagg_hpy as _tkagg
 
     fig, ax = plt.subplots()
     photoimage = fig.canvas._tkphoto
