@@ -1432,7 +1432,7 @@ class QuadContourSet(ContourSet):
             self._mins = args[0]._mins
             self._maxs = args[0]._maxs
         else:
-            import matplotlib._contour as _contour
+            import matplotlib._contour_hpy as _contour
 
             if corner_mask is None:
                 corner_mask = mpl.rcParams['contour.corner_mask']

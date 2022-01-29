@@ -392,7 +392,7 @@ class Matplotlib(SetupPackage):
         yield ext
         # contour
         ext = Extension(
-            "matplotlib._contour", [
+            "matplotlib._contour_hpy", [
                 "src/_contour.cpp",
                 "src/_contour_wrapper.cpp",
                 "src/py_converters.cpp",

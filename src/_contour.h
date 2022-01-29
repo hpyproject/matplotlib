@@ -148,6 +148,8 @@
 #include <iostream>
 #include <vector>
 
+#include "hpy.h"
+
 
 // Edge of a quad including diagonal edges of masked quads if _corner_mask true.
 typedef enum
@@ -287,11 +289,11 @@ public:
 
     // Create and return polygons for a line (i.e. non-filled) contour at the
     // specified level.
-    PyObject* create_contour(const double& level);
+    HPy create_contour(HPyContext *ctx, const double& level);
 
     // Create and return polygons for a filled contour between the two
     // specified levels.
-    PyObject* create_filled_contour(const double& lower_level,
+    HPy create_filled_contour(HPyContext *ctx, const double& lower_level,
                                     const double& upper_level);
 
 private:
@@ -322,9 +324,9 @@ private:
     // contours where each ContourLine is converted to a separate numpy array
     // of (x,y) points.
     // Clears the ContourLine too.
-    void append_contour_line_to_vertices_and_codes(ContourLine& contour_line,
-                                                   PyObject* vertices_list,
-                                                   PyObject* codes_list) const;
+    void append_contour_line_to_vertices_and_codes(HPyContext *ctx, ContourLine& contour_line,
+                                         HPy vertices_list,
+                                         HPy codes_list) const;
 
     // Append a C++ Contour to the end of two python lists.  Used for filled
     // contours where each non-hole ContourLine and its child holes are
@@ -333,9 +335,9 @@ private:
     // individual polygons.
     // Clears the Contour too, freeing each ContourLine as soon as possible
     // for minimum RAM usage.
-    void append_contour_to_vertices_and_codes(Contour& contour,
-                                              PyObject* vertices_list,
-                                              PyObject* codes_list) const;
+    void append_contour_to_vertices_and_codes(HPyContext *ctx, Contour& contour,
+                                              HPy vertices_list,
+                                              HPy codes_list) const;
 
     // Return number of chunks that fit in the specified point_count.
     long calc_chunk_count(long point_count) const;
@@ -495,8 +497,9 @@ private:
     //   level: contour z-value.
     // Returns true if the start quad does not need to be visited again, i.e.
     // VISITED(quad,1).
-    bool start_line(PyObject* vertices_list,
-                    PyObject* codes_list,
+    bool start_line(HPyContext *ctx, 
+                    HPy vertices_list,
+                    HPy codes_list,
                     long quad,
                     Edge edge,
                     const double& level);
