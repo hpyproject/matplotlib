@@ -6,7 +6,7 @@
  * class without specifying a triangles array.
  */
 #define PY_SSIZE_T_CLEAN
-#include "Python.h"
+#include "hpy.h"
 #include "numpy_cpp.h"
 #ifdef _MSC_VER
 /* The Qhull header does not declare this as extern "C", but only MSVC seems to
@@ -29,13 +29,13 @@ extern const char qh_version[];
 #define STR(x) #x
 
 
-static const char* qhull_error_msg[6] = {
-    "",                     /* 0 = qh_ERRnone */
-    "input inconsistency",  /* 1 = qh_ERRinput */
-    "singular input data",  /* 2 = qh_ERRsingular */
-    "precision error",      /* 3 = qh_ERRprec */
-    "insufficient memory",  /* 4 = qh_ERRmem */
-    "internal error"};      /* 5 = qh_ERRqhull */
+// static const char* qhull_error_msg[6] = {
+//     "",                     /* 0 = qh_ERRnone */
+//     "input inconsistency",  /* 1 = qh_ERRinput */
+//     "singular input data",  /* 2 = qh_ERRsingular */
+//     "precision error",      /* 3 = qh_ERRprec */
+//     "insufficient memory",  /* 4 = qh_ERRmem */
+//     "internal error"};      /* 5 = qh_ERRqhull */
 
 
 /* Return the indices of the 3 vertices that comprise the specified facet (i.e.
@@ -125,8 +125,8 @@ private:
 /* Delaunay implementation method.
  * If hide_qhull_errors is true then qhull error messages are discarded;
  * if it is false then they are written to stderr. */
-static PyObject*
-delaunay_impl(npy_intp npoints, const double* x, const double* y,
+static HPy
+delaunay_impl(HPyContext *ctx, npy_intp npoints, const double* x, const double* y,
               bool hide_qhull_errors)
 {
     qhT qh_qh;                  /* qh variable type and name must be like */
@@ -179,11 +179,13 @@ delaunay_impl(npy_intp npoints, const double* x, const double* y,
     exitcode = qh_new_qhull(qh, ndim, (int)npoints, points.data(), False,
                             (char*)"qhull d Qt Qbb Qc Qz", NULL, error_file);
     if (exitcode != qh_ERRnone) {
-        PyErr_Format(PyExc_RuntimeError,
-                     "Error in qhull Delaunay triangulation calculation: %s (exitcode=%d)%s",
-                     qhull_error_msg[exitcode], exitcode,
-                     hide_qhull_errors ? "; use python verbose option (-v) to see original qhull error." : "");
-        return NULL;
+        // PyErr_Format(PyExc_RuntimeError,
+        //              "Error in qhull Delaunay triangulation calculation: %s (exitcode=%d)%s",
+        //              qhull_error_msg[exitcode], exitcode,
+        //              hide_qhull_errors ? "; use python verbose option (-v) to see original qhull error." : "");
+        HPyErr_SetString(ctx, ctx->h_RuntimeError,
+                     "Error in qhull Delaunay triangulation calculation");
+        return HPy_NULL;
     }
 
     /* Split facets so that they only have 3 points each. */
@@ -238,86 +240,118 @@ delaunay_impl(npy_intp npoints, const double* x, const double* y,
         }
     }
 
-    PyObject* tuple = PyTuple_New(2);
-    if (tuple == 0) {
+    HPy tuple[] = {
+        HPy_FromPyObject(ctx, (cpy_PyObject *)triangles.pyobj()), 
+        HPy_FromPyObject(ctx, (cpy_PyObject *)neighbors.pyobj())
+    };
+    
+    HPy h_tuple = HPyTuple_FromArray(ctx, tuple, 2);
+    if (HPy_IsNull(h_tuple)) {
         throw std::runtime_error("Failed to create Python tuple");
     }
-
-    PyTuple_SET_ITEM(tuple, 0, triangles.pyobj());
-    PyTuple_SET_ITEM(tuple, 1, neighbors.pyobj());
-    return tuple;
+    return h_tuple;
 }
 
 /* Process Python arguments and call Delaunay implementation method. */
-static PyObject*
-delaunay(PyObject *self, PyObject *args)
+static HPy
+delaunay(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy xarg = HPy_NULL;
+    HPy yarg = HPy_NULL;
     numpy::array_view<double, 1> xarray;
     numpy::array_view<double, 1> yarray;
-    PyObject* ret;
+    HPy ret;
     npy_intp npoints;
     const double* x;
     const double* y;
 
-    if (!PyArg_ParseTuple(args, "O&O&",
-                          &xarray.converter_contiguous, &xarray,
-                          &yarray.converter_contiguous, &yarray)) {
-        return NULL;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, "OO", 
+                      &xarg, 
+                      &yarg)) {
+        return HPy_NULL;
+    }
+
+    if (!xarray.converter_contiguous(HPy_AsPyObject(ctx, xarg), &xarray) 
+            || !yarray.converter_contiguous(HPy_AsPyObject(ctx, yarg), &yarray)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, ""); // TODO
+        return HPy_NULL;
     }
 
     npoints = xarray.dim(0);
     if (npoints != yarray.dim(0)) {
-        PyErr_SetString(PyExc_ValueError,
+        HPyErr_SetString(ctx, ctx->h_ValueError,
                         "x and y must be 1D arrays of the same length");
-        return NULL;
+        return HPy_NULL;
     }
 
     if (npoints < 3) {
-        PyErr_SetString(PyExc_ValueError,
+        HPyErr_SetString(ctx, ctx->h_ValueError,
                         "x and y arrays must have a length of at least 3");
-        return NULL;
+        return HPy_NULL;
     }
 
     x = xarray.data();
     y = yarray.data();
 
     if (!at_least_3_unique_points(npoints, x, y)) {
-        PyErr_SetString(PyExc_ValueError,
+        HPyErr_SetString(ctx, ctx->h_ValueError,
                         "x and y arrays must consist of at least 3 unique points");
-        return NULL;
+        return HPy_NULL;
     }
 
-    CALL_CPP("qhull.delaunay",
-             (ret = delaunay_impl(npoints, x, y, Py_VerboseFlag == 0)));
+    CALL_CPP_HPY(ctx, "qhull.delaunay",
+             (ret = delaunay_impl(ctx, npoints, x, y, Py_VerboseFlag == 0)));
 
     return ret;
 }
 
 /* Return qhull version string for assistance in debugging. */
-static PyObject*
-version(PyObject *self, PyObject *arg)
+static HPy
+version(HPyContext *ctx, HPy module)
 {
-    return PyBytes_FromString(qh_version);
+    return HPyBytes_FromString(ctx, qh_version);
 }
 
-static PyMethodDef qhull_methods[] = {
-    {"delaunay", delaunay, METH_VARARGS, ""},
-    {"version", version, METH_NOARGS, ""},
-    {NULL, NULL, 0, NULL}
+HPyDef_METH(delaunay_def, "delaunay", delaunay, HPyFunc_VARARGS, .doc = "")
+HPyDef_METH(version_def, "version", version, HPyFunc_NOARGS, .doc = "")
+static HPyDef *module_defines[] = {
+    &delaunay_def,
+    &version_def,
+    NULL
 };
 
-static struct PyModuleDef qhull_module = {
-    PyModuleDef_HEAD_INIT,
-    "qhull", "Computing Delaunay triangulations.\n", -1, qhull_methods
+static HPyModuleDef moduledef = {
+    .name = "_qhull_hpy",
+    .doc = "Computing Delaunay triangulations.\n",
+    .size = -1,
+    .defines = module_defines,
 };
+
+// Logic is from NumPy's import_array()
+static int npy_import_array_hpy(HPyContext *ctx) {
+    if (_import_array() < 0) {
+        // HPyErr_Print(ctx); TODO
+        HPyErr_SetString(ctx, ctx->h_ImportError, "numpy.core.multiarray failed to import"); 
+        return 0; 
+    }
+    return 1;
+}
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #pragma GCC visibility push(default)
-
-PyMODINIT_FUNC
-PyInit__qhull(void)
+HPy_MODINIT(_qhull_hpy)
+static HPy init__qhull_hpy_impl(HPyContext *ctx)
 {
-    import_array();
-    return PyModule_Create(&qhull_module);
+    if (!npy_import_array_hpy(ctx)) {
+        return HPy_NULL;
+    }
+
+    return HPyModule_Create(ctx, &moduledef);
 }
 
 #pragma GCC visibility pop
+#ifdef __cplusplus
+}
+#endif

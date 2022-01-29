@@ -36,7 +36,7 @@ class Triangulation:
     triangles formed from colinear points, or overlapping triangles.
     """
     def __init__(self, x, y, triangles=None, mask=None):
-        from matplotlib import _qhull
+        from matplotlib import _qhull_hpy as _qhull
 
         self.x = np.asarray(x, dtype=np.float64)
         self.y = np.asarray(y, dtype=np.float64)
