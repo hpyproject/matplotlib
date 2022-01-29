@@ -27,7 +27,11 @@
 #endif
 #endif
 
+#ifdef HPY
+#include "hpy.h"
+#else
 #include <Python.h>
+#endif
 
 inline double mpl_round(double v)
 {
