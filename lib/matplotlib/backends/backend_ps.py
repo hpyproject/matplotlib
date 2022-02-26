@@ -35,6 +35,7 @@ from matplotlib.texmanager import TexManager
 from matplotlib.transforms import Affine2D
 from matplotlib.backends.backend_mixed import MixedModeRenderer
 from . import _backend_pdf_ps
+from matplotlib import ft2font
 
 _log = logging.getLogger(__name__)
 
@@ -192,7 +193,7 @@ FontName currentdict end definefont pop
 
     entries = []
     for glyph_id in glyph_ids:
-        g = font.load_glyph(glyph_id, LOAD_NO_SCALE)
+        g = font.load_glyph(ft2font, glyph_id, LOAD_NO_SCALE)
         v, c = font.get_path()
         entries.append(
             "/%(name)s{%(bbox)s sc\n" % {

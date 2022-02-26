@@ -43,6 +43,7 @@ from matplotlib.path import Path
 from matplotlib.dates import UTC
 from matplotlib import _path
 from . import _backend_pdf_ps
+from matplotlib import ft2font
 
 _log = logging.getLogger(__name__)
 
@@ -566,7 +567,7 @@ def _get_pdf_charprocs(font_path, glyph_ids):
     conv = 1000 / font.units_per_EM  # Conversion to PS units (1/1000's).
     procs = {}
     for glyph_id in glyph_ids:
-        g = font.load_glyph(glyph_id, LOAD_NO_SCALE)
+        g = font.load_glyph(ft2font, glyph_id, LOAD_NO_SCALE)
         # NOTE: We should be using round(), but instead use
         # "(x+.5).astype(int)" to keep backcompat with the old ttconv code
         # (this is different for negative x's).
@@ -1114,7 +1115,7 @@ end"""
             # Make the "Widths" array
             def get_char_width(charcode):
                 s = ord(cp1252.decoding_table[charcode])
-                width = font.load_char(
+                width = font.load_char(ft2font,
                     s, flags=LOAD_NO_SCALE | LOAD_NO_HINTING).horiAdvance
                 return cvt(width)
 
@@ -1249,7 +1250,7 @@ end"""
             for c in characters:
                 ccode = c
                 gind = font.get_char_index(ccode)
-                glyph = font.load_char(ccode,
+                glyph = font.load_char(ft2font, ccode,
                                        flags=LOAD_NO_SCALE | LOAD_NO_HINTING)
                 widths.append((ccode, cvt(glyph.horiAdvance)))
                 if ccode < 65536:

@@ -5,6 +5,7 @@ Text layouting utilities.
 import dataclasses
 
 from .ft2font import KERNING_DEFAULT, LOAD_NO_HINTING
+from . import ft2font
 
 
 LayoutItem = dataclasses.make_dataclass(
@@ -38,7 +39,7 @@ def layout(string, font, *, kern_mode=KERNING_DEFAULT):
         kern = (font.get_kerning(prev_glyph_idx, glyph_idx, kern_mode) / 64
                 if prev_glyph_idx is not None else 0.)
         x += kern
-        glyph = font.load_glyph(glyph_idx, flags=LOAD_NO_HINTING)
+        glyph = font.load_glyph(ft2font, glyph_idx, flags=LOAD_NO_HINTING)
         yield LayoutItem(char, glyph_idx, x, kern)
         x += glyph.linearHoriAdvance / 65536
         prev_glyph_idx = glyph_idx

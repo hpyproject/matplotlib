@@ -24,7 +24,7 @@ from ._mathtext_data import (
 from .afm import AFM
 from .font_manager import FontProperties, findfont, get_font
 from .ft2font import KERNING_DEFAULT
-
+from . import ft2font
 
 ParserElement.enablePackrat()
 _log = logging.getLogger("matplotlib.mathtext")
@@ -267,7 +267,7 @@ class TruetypeFonts(Fonts):
             self._get_glyph(fontname, font_class, sym, fontsize, math)
 
         font.set_size(fontsize, dpi)
-        glyph = font.load_char(
+        glyph = font.load_char(ft2font,
             num,
             flags=self.mathtext_backend.get_hinting_type())
 

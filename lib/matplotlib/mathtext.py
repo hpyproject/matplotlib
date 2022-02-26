@@ -33,6 +33,7 @@ from matplotlib._mathtext import (  # noqa: F401
 from matplotlib._mathtext_data import (  # noqa: F401
     latex_to_bakoma, latex_to_cmex, latex_to_standard, stix_virtual_fonts,
     tex2uni)
+from matplotlib import ft2font
 
 _log = logging.getLogger(__name__)
 
@@ -127,7 +128,7 @@ class MathtextBackendAgg(MathtextBackend):
                               ox + info.metrics.xmax,
                               oy - info.metrics.ymin)
         else:
-            info.font.draw_glyph_to_bitmap(
+            info.font.draw_glyph_to_bitmap(ft2font,
                 self.image, ox, oy - info.metrics.iceberg, info.glyph,
                 antialiased=rcParams['text.antialiased'])
 

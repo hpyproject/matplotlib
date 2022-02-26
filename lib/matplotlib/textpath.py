@@ -11,6 +11,7 @@ from matplotlib.ft2font import LOAD_NO_HINTING, LOAD_TARGET_LIGHT
 from matplotlib.mathtext import MathTextParser
 from matplotlib.path import Path
 from matplotlib.transforms import Affine2D
+from matplotlib import ft2font
 
 _log = logging.getLogger(__name__)
 
@@ -194,7 +195,7 @@ class TextToPath:
             if char_id not in glyph_map:
                 font.clear()
                 font.set_size(self.FONT_SCALE, self.DPI)
-                font.load_char(ccode, flags=LOAD_NO_HINTING)
+                font.load_char(ft2font, ccode, flags=LOAD_NO_HINTING)
                 glyph_map_new[char_id] = font.get_path()
 
             xpositions.append(ox)
@@ -253,9 +254,9 @@ class TextToPath:
                 # See comments in _get_ps_font_and_encoding.
                 if enc is not None:
                     index = font.get_name_index(enc[glyph])
-                    font.load_glyph(index, flags=LOAD_TARGET_LIGHT)
+                    font.load_glyph(ft2font, index, flags=LOAD_TARGET_LIGHT)
                 else:
-                    font.load_char(glyph, flags=LOAD_TARGET_LIGHT)
+                    font.load_char(ft2font, glyph, flags=LOAD_TARGET_LIGHT)
                 glyph_map_new[char_id] = font.get_path()
 
             glyph_ids.append(char_id)
