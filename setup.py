@@ -84,14 +84,21 @@ class NoopTestCommand(TestCommand):
         print("Matplotlib does not support running tests with "
               "'python setup.py test'. Please run 'pytest'.")
 
+def hpy_finalize_ext(distribution, ext):
+    distribution.command_obj['build_ext']._finalize_hpy_ext(ext)
+    ext._needs_stub = ext._hpy_needs_stub
+    return ext
 
 class BuildExtraLibraries(BuildExtCommand):
     def finalize_options(self):
-        self.distribution.ext_modules[:] = [
-            ext
+        self.distribution.ext_modules[:] = []
+
+        self.distribution.hpy_ext_modules[:] = [
+            hpy_finalize_ext(self.distribution, ext)
             for package in good_packages
             for ext in package.get_extensions()
         ]
+        self._extensions = self.distribution.ext_modules + self.distribution.hpy_ext_modules
         super().finalize_options()
 
     def add_optimization_flags(self):
@@ -295,10 +302,12 @@ setup(  # Finally, pass this all along to distutils to do the heavy lifting.
     # Dummy extension to trigger build_ext, which will swap it out with
     # real extensions that can depend on numpy for the build.
     ext_modules=[Extension("", [])],
+    hpy_ext_modules=[Extension("", [])],
     package_data=package_data,
 
     python_requires='>={}'.format('.'.join(str(n) for n in py_min_version)),
     setup_requires=[
+        "hpy>0.0.2",
         "certifi>=2020.06.20",
         "numpy>=1.16",
     ],
