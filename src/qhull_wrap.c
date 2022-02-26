@@ -6,7 +6,7 @@
  * class without specifying a triangles array.
  */
 #define PY_SSIZE_T_CLEAN
-#include "Python.h"
+#include "hpy.h"
 #include "numpy/ndarrayobject.h"
 #include "libqhull_r/qhull_ra.h"
 #include <stdio.h>
@@ -84,8 +84,8 @@ at_least_3_unique_points(int npoints, const double* x, const double* y)
 
 /* Delaunay implementation methyod.  If hide_qhull_errors is 1 then qhull error
  * messages are discarded; if it is 0 then they are written to stderr. */
-static PyObject*
-delaunay_impl(int npoints, const double* x, const double* y,
+static HPy
+delaunay_impl(HPyContext *ctx, int npoints, const double* x, const double* y,
               int hide_qhull_errors)
 {
 	qhT qh_qh;                  /* qh variable type and name must be like */
@@ -98,7 +98,6 @@ delaunay_impl(int npoints, const double* x, const double* y,
     int* tri_indices = NULL;    /* Maps qhull facet id to triangle index. */
     int indices[3];
     int curlong, totlong;       /* Memory remaining after qh_memfreeshort. */
-    PyObject* tuple;            /* Return tuple (triangles, neighbors). */
     const int ndim = 2;
     npy_intp dims[2];
     PyArrayObject* triangles = NULL;
@@ -113,7 +112,7 @@ delaunay_impl(int npoints, const double* x, const double* y,
     /* Allocate points. */
     points = (coordT*)malloc(npoints*ndim*sizeof(coordT));
     if (points == NULL) {
-        PyErr_SetString(PyExc_MemoryError,
+        HPyErr_SetString(ctx, ctx->h_MemoryError,
                         "Could not allocate points array in qhull.delaunay");
         goto error_before_qhull;
     }
@@ -139,7 +138,7 @@ delaunay_impl(int npoints, const double* x, const double* y,
          * setupext.py and passed in via the macro MPL_DEVNULL. */
         error_file = fopen(STRINGIFY(MPL_DEVNULL), "w");
         if (error_file == NULL) {
-            PyErr_SetString(PyExc_RuntimeError,
+            HPyErr_SetString(ctx, ctx->h_RuntimeError,
                             "Could not open devnull in qhull.delaunay");
             goto error_before_qhull;
         }
@@ -177,7 +176,7 @@ delaunay_impl(int npoints, const double* x, const double* y,
     /* Create array to map facet id to triangle index. */
     tri_indices = (int*)malloc((max_facet_id+1)*sizeof(int));
     if (tri_indices == NULL) {
-        PyErr_SetString(PyExc_MemoryError,
+        HPyErr_SetString(ctx, ctx->h_MemoryError,
                         "Could not allocate triangle map in qhull.delaunay");
         goto error;
     }
@@ -187,14 +186,14 @@ delaunay_impl(int npoints, const double* x, const double* y,
     dims[1] = 3;
     triangles = (PyArrayObject*)PyArray_SimpleNew(ndim, dims, NPY_INT);
     if (triangles == NULL) {
-        PyErr_SetString(PyExc_MemoryError,
+        HPyErr_SetString(ctx, ctx->h_MemoryError,
                         "Could not allocate triangles array in qhull.delaunay");
         goto error;
     }
 
     neighbors = (PyArrayObject*)PyArray_SimpleNew(ndim, dims, NPY_INT);
     if (neighbors == NULL) {
-        PyErr_SetString(PyExc_MemoryError,
+        HPyErr_SetString(ctx, ctx->h_MemoryError,
                         "Could not allocate neighbors array in qhull.delaunay");
         goto error;
     }
@@ -230,17 +229,19 @@ delaunay_impl(int npoints, const double* x, const double* y,
     qh_freeqhull(qh, !qh_ALL);
     qh_memfreeshort(qh, &curlong, &totlong);
     if (curlong || totlong)
-        PyErr_WarnEx(PyExc_RuntimeWarning,
+        HPyErr_WarnEx(ctx, ctx->h_RuntimeWarning,
                      "Qhull could not free all allocated memory", 1);
     if (hide_qhull_errors)
         fclose(error_file);
     free(tri_indices);
     free(points);
 
-    tuple = PyTuple_New(2);
-    PyTuple_SetItem(tuple, 0, (PyObject*)triangles);
-    PyTuple_SetItem(tuple, 1, (PyObject*)neighbors);
-    return tuple;
+    HPy tuple[] = {
+        HPy_FromPyObject(ctx, (cpy_PyObject *)triangles), 
+        HPy_FromPyObject(ctx, (cpy_PyObject *)neighbors)
+    };
+    
+    return HPyTuple_FromArray(ctx, tuple, 2);
 
 error:
     /* Clean up. */
@@ -256,38 +257,38 @@ error:
 error_before_qhull:
     free(points);
 
-    return NULL;
+    return HPy_NULL;
 }
 
 /* Process python arguments and call Delaunay implementation method. */
-static PyObject*
-delaunay(PyObject *self, PyObject *args)
+static HPy
+delaunay(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
-    PyObject* xarg;
-    PyObject* yarg;
+    HPy xarg;
+    HPy yarg;
     PyArrayObject* xarray;
     PyArrayObject* yarray;
-    PyObject* ret;
+    HPy ret;
     int npoints;
     const double* x;
     const double* y;
 
-    if (!PyArg_ParseTuple(args, "OO", &xarg, &yarg)) {
-        PyErr_SetString(PyExc_ValueError, "expecting x and y arrays");
-        return NULL;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, "OO", &xarg, &yarg)) {
+        HPyErr_SetString(ctx, ctx->h_ValueError, "expecting x and y arrays");
+        return HPy_NULL;
     }
 
-    xarray = (PyArrayObject*)PyArray_ContiguousFromObject(xarg, NPY_DOUBLE,
+    xarray = (PyArrayObject*)PyArray_ContiguousFromObject(HPy_AsPyObject(ctx, xarg), NPY_DOUBLE,
                                                           1, 1);
-    yarray = (PyArrayObject*)PyArray_ContiguousFromObject(yarg, NPY_DOUBLE,
+    yarray = (PyArrayObject*)PyArray_ContiguousFromObject(HPy_AsPyObject(ctx, yarg), NPY_DOUBLE,
                                                           1, 1);
     if (xarray == 0 || yarray == 0 ||
         PyArray_DIM(xarray,0) != PyArray_DIM(yarray, 0)) {
         Py_XDECREF(xarray);
         Py_XDECREF(yarray);
-        PyErr_SetString(PyExc_ValueError,
+        HPyErr_SetString(ctx, ctx->h_ValueError,
                         "x and y must be 1D arrays of the same length");
-        return NULL;
+        return HPy_NULL;
     }
 
     npoints = PyArray_DIM(xarray, 0);
@@ -295,9 +296,9 @@ delaunay(PyObject *self, PyObject *args)
     if (npoints < 3) {
         Py_XDECREF(xarray);
         Py_XDECREF(yarray);
-        PyErr_SetString(PyExc_ValueError,
+        HPyErr_SetString(ctx, ctx->h_ValueError,
                         "x and y arrays must have a length of at least 3");
-        return NULL;
+        return HPy_NULL;
     }
 
     x = (const double*)PyArray_DATA(xarray);
@@ -306,12 +307,12 @@ delaunay(PyObject *self, PyObject *args)
     if (!at_least_3_unique_points(npoints, x, y)) {
         Py_XDECREF(xarray);
         Py_XDECREF(yarray);
-        PyErr_SetString(PyExc_ValueError,
+        HPyErr_SetString(ctx, ctx->h_ValueError,
                         "x and y arrays must consist of at least 3 unique points");
-        return NULL;
+        return HPy_NULL;
     }
 
-    ret = delaunay_impl(npoints, x, y, Py_VerboseFlag == 0);
+    ret = delaunay_impl(ctx, npoints, x, y, Py_VerboseFlag == 0);
 
     Py_XDECREF(xarray);
     Py_XDECREF(yarray);
@@ -319,43 +320,58 @@ delaunay(PyObject *self, PyObject *args)
 }
 
 /* Return qhull version string for assistance in debugging. */
-static PyObject*
-version(void)
+static HPy
+version(HPyContext *ctx, HPy module)
 {
-    return PyBytes_FromString(qh_version);
+    return HPyBytes_FromString(ctx, qh_version);
 }
 
-static PyMethodDef qhull_methods[] = {
-    {"delaunay", (PyCFunction)delaunay, METH_VARARGS, ""},
-    {"version", (PyCFunction)version, METH_NOARGS, ""},
-    {NULL, NULL, 0, NULL}
+
+HPyDef_METH(delaunay_def, "delaunay", delaunay, HPyFunc_VARARGS, .doc = "")
+HPyDef_METH(version_def, "version", version, HPyFunc_NOARGS, .doc = "")
+static HPyDef *module_defines[] = {
+    &delaunay_def,
+    &version_def,
+    NULL
 };
 
-static struct PyModuleDef qhull_module = {
-    PyModuleDef_HEAD_INIT,
-    "qhull",
-    "Computing Delaunay triangulations.\n",
-    -1,
-    qhull_methods,
-    NULL, NULL, NULL, NULL
+static HPyModuleDef moduledef = {
+    .name = "_qhull",
+    .doc = "Computing Delaunay triangulations.\n",
+    .size = -1,
+    .defines = module_defines,
 };
+
+// Logic is from NumPy's import_array()
+static int npy_import_array_hpy(HPyContext *ctx) {
+    if (_import_array() < 0) {
+        // HPyErr_Print(ctx); TODO
+        HPyErr_SetString(ctx, ctx->h_ImportError, "numpy.core.multiarray failed to import"); 
+        return 0; 
+    }
+    return 1;
+}
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #pragma GCC visibility push(default)
-
-PyMODINIT_FUNC
-PyInit__qhull(void)
+HPy_MODINIT(_qhull)
+static HPy init__qhull_impl(HPyContext *ctx)
 {
-    PyObject* m;
-
-    m = PyModule_Create(&qhull_module);
-
-    if (m == NULL) {
-        return NULL;
+    if (!npy_import_array_hpy(ctx)) {
+        return HPy_NULL;
     }
 
-    import_array();
+    HPy m = HPyModule_Create(ctx, &moduledef);
+    if (HPy_IsNull(m)) {
+        return HPy_NULL;
+    }
 
     return m;
 }
 
 #pragma GCC visibility pop
+#ifdef __cplusplus
+}
+#endif
