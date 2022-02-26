@@ -5,9 +5,9 @@
 #include "py_converters.h"
 #include "py_adaptors.h"
 
-PyObject *convert_polygon_vector(std::vector<Polygon> &polygons)
+HPy convert_polygon_vector(HPyContext *ctx, std::vector<Polygon> &polygons)
 {
-    PyObject *pyresult = PyList_New(polygons.size());
+    HPyListBuilder pyresult = HPyListBuilder_New(ctx, polygons.size());
 
     for (size_t i = 0; i < polygons.size(); ++i) {
         Polygon poly = polygons[i];
@@ -19,44 +19,46 @@ PyObject *convert_polygon_vector(std::vector<Polygon> &polygons)
         numpy::array_view<double, 2> subresult(dims);
         memcpy(subresult.data(), &poly[0], sizeof(double) * poly.size() * 2);
 
-        if (PyList_SetItem(pyresult, i, subresult.pyobj())) {
-            Py_DECREF(pyresult);
-            return NULL;
-        }
+        HPyListBuilder_Set(ctx, pyresult, i, HPy_FromPyObject(ctx, subresult.pyobj()));
     }
 
-    return pyresult;
+    return HPyListBuilder_Build(ctx, pyresult);
 }
 
-const char *Py_point_in_path__doc__ =
+static const char *Py_point_in_path__doc__ =
     "point_in_path(x, y, radius, path, trans)\n"
     "--\n\n";
 
-static PyObject *Py_point_in_path(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_point_in_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_path = HPy_NULL, h_trans = HPy_NULL;
     double x, y, r;
     py::PathIterator path;
     agg::trans_affine trans;
     bool result;
 
-    if (!PyArg_ParseTuple(args,
-                          "dddO&O&:point_in_path",
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "dddOO:point_in_path",
                           &x,
                           &y,
                           &r,
-                          &convert_path,
-                          &path,
-                          &convert_trans_affine,
-                          &trans)) {
-        return NULL;
+                          &h_path,
+                          &h_trans)) {
+        return HPy_NULL;
     }
 
-    CALL_CPP("point_in_path", (result = point_in_path(x, y, r, path, trans)));
+    if (!convert_path_hpy(ctx, h_path, &path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "point_in_path"); // TODO
+        return HPy_NULL;
+    }
+
+    CALL_CPP_HPY(ctx, "point_in_path", (result = point_in_path(x, y, r, path, trans)));
 
     if (result) {
-        Py_RETURN_TRUE;
+        return HPy_Dup(ctx, ctx->h_True);
     } else {
-        Py_RETURN_FALSE;
+        return HPy_Dup(ctx, ctx->h_False);
     }
 }
 
@@ -64,62 +66,75 @@ const char *Py_points_in_path__doc__ =
     "points_in_path(points, radius, path, trans)\n"
     "--\n\n";
 
-static PyObject *Py_points_in_path(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_points_in_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_points = HPy_NULL;
+    HPy h_path = HPy_NULL;
+    HPy h_trans = HPy_NULL;
     numpy::array_view<const double, 2> points;
     double r;
     py::PathIterator path;
     agg::trans_affine trans;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&dO&O&:points_in_path",
-                          &convert_points,
-                          &points,
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "OdOO:points_in_path",
+                          &h_points,
                           &r,
-                          &convert_path,
-                          &path,
-                          &convert_trans_affine,
-                          &trans)) {
-        return NULL;
+                          &h_path,
+                          &h_trans)) {
+        return HPy_NULL;
+    }
+
+    if (!convert_points_hpy(ctx, h_points, &points)
+                || !convert_path_hpy(ctx, h_path, &path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "points_in_path"); // TODO
+        return HPy_NULL;
     }
 
     npy_intp dims[] = { (npy_intp)points.size() };
     numpy::array_view<uint8_t, 1> results(dims);
 
-    CALL_CPP("points_in_path", (points_in_path(points, r, path, trans, results)));
+    CALL_CPP_HPY(ctx, "points_in_path", (points_in_path(points, r, path, trans, results)));
 
-    return results.pyobj();
+    return HPy_FromPyObject(ctx, results.pyobj());
 }
 
 const char *Py_point_on_path__doc__ =
     "point_on_path(x, y, radius, path, trans)\n"
     "--\n\n";
 
-static PyObject *Py_point_on_path(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_point_on_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_path = HPy_NULL;
+    HPy h_trans = HPy_NULL;
     double x, y, r;
     py::PathIterator path;
     agg::trans_affine trans;
     bool result;
 
-    if (!PyArg_ParseTuple(args,
-                          "dddO&O&:point_on_path",
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "dddOO:point_on_path",
                           &x,
                           &y,
                           &r,
-                          &convert_path,
-                          &path,
-                          &convert_trans_affine,
-                          &trans)) {
-        return NULL;
+                          &h_path,
+                          &h_trans)) {
+        return HPy_NULL;
     }
 
-    CALL_CPP("point_on_path", (result = point_on_path(x, y, r, path, trans)));
+    if (!convert_path_hpy(ctx, h_path, &path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "point_on_path"); // TODO
+        return HPy_NULL;
+    }
+
+    CALL_CPP_HPY(ctx, "point_on_path", (result = point_on_path(x, y, r, path, trans)));
 
     if (result) {
-        Py_RETURN_TRUE;
+        return HPy_Dup(ctx, ctx->h_True);
     } else {
-        Py_RETURN_FALSE;
+        return HPy_Dup(ctx, ctx->h_False);
     }
 }
 
@@ -127,51 +142,66 @@ const char *Py_points_on_path__doc__ =
     "points_on_path(points, radius, path, trans)\n"
     "--\n\n";
 
-static PyObject *Py_points_on_path(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_points_on_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_points = HPy_NULL;
+    HPy h_path = HPy_NULL;
+    HPy h_trans = HPy_NULL;
     numpy::array_view<const double, 2> points;
     double r;
     py::PathIterator path;
     agg::trans_affine trans;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&dO&O&:points_on_path",
-                          &convert_points,
-                          &points,
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "OdOO:points_on_path",
+                          &h_points,
                           &r,
-                          &convert_path,
-                          &path,
-                          &convert_trans_affine,
-                          &trans)) {
-        return NULL;
+                          &h_path,
+                          &h_trans)) {
+        return HPy_NULL;
+    }
+
+    if (!convert_points_hpy(ctx, h_points, &points)
+                || !convert_path_hpy(ctx, h_path, &path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "points_on_path"); // TODO
+        return HPy_NULL;
     }
 
     npy_intp dims[] = { (npy_intp)points.size() };
     numpy::array_view<uint8_t, 1> results(dims);
 
-    CALL_CPP("points_on_path", (points_on_path(points, r, path, trans, results)));
+    CALL_CPP_HPY(ctx, "points_on_path", (points_on_path(points, r, path, trans, results)));
 
-    return results.pyobj();
+    return HPy_FromPyObject(ctx, results.pyobj());
 }
 
 const char *Py_get_path_extents__doc__ =
     "get_path_extents(path, trans)\n"
     "--\n\n";
 
-static PyObject *Py_get_path_extents(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_get_path_extents(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_path = HPy_NULL;
+    HPy h_trans = HPy_NULL;
     py::PathIterator path;
     agg::trans_affine trans;
 
-    if (!PyArg_ParseTuple(
-             args, "O&O&:get_path_extents", &convert_path, &path, &convert_trans_affine, &trans)) {
-        return NULL;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+             "OO:get_path_extents", &h_path, &h_trans)) {
+        return HPy_NULL;
+    }
+
+    if (!convert_path_hpy(ctx, h_path, &path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "get_path_extents"); // TODO
+        return HPy_NULL;
     }
 
     extent_limits e;
 
-    CALL_CPP("get_path_extents", (reset_limits(e)));
-    CALL_CPP("get_path_extents", (update_path_extents(path, trans, e)));
+    CALL_CPP_HPY(ctx, "get_path_extents", (reset_limits(e)));
+    CALL_CPP_HPY(ctx, "get_path_extents", (update_path_extents(path, trans, e)));
 
     npy_intp dims[] = { 2, 2 };
     numpy::array_view<double, 2> extents(dims);
@@ -180,15 +210,19 @@ static PyObject *Py_get_path_extents(PyObject *self, PyObject *args, PyObject *k
     extents(1, 0) = e.x1;
     extents(1, 1) = e.y1;
 
-    return extents.pyobj();
+    return HPy_FromPyObject(ctx, extents.pyobj());
 }
 
 const char *Py_update_path_extents__doc__ =
     "update_path_extents(path, trans, rect, minpos, ignore)\n"
     "--\n\n";
 
-static PyObject *Py_update_path_extents(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_update_path_extents(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_path = HPy_NULL;
+    HPy h_trans = HPy_NULL;
+    HPy h_rect = HPy_NULL;
+    HPy h_minpos = HPy_NULL;
     py::PathIterator path;
     agg::trans_affine trans;
     agg::rect_d rect;
@@ -196,31 +230,37 @@ static PyObject *Py_update_path_extents(PyObject *self, PyObject *args, PyObject
     int ignore;
     int changed;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&O&O&i:update_path_extents",
-                          &convert_path,
-                          &path,
-                          &convert_trans_affine,
-                          &trans,
-                          &convert_rect,
-                          &rect,
-                          &minpos.converter,
-                          &minpos,
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "OOOOi:update_path_extents",
+                          &h_path,
+                          &h_trans,
+                          &h_rect,
+                          &h_minpos,
                           &ignore)) {
-        return NULL;
+        return HPy_NULL;
+    }
+
+    if (!convert_path_hpy(ctx, h_path, &path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)
+                || !convert_rect_hpy(ctx, h_rect, &rect)
+                || !minpos.converter(HPy_AsPyObject(ctx, h_minpos), &minpos)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "update_path_extents"); // TODO
+        return HPy_NULL;
     }
 
     if (minpos.dim(0) != 2) {
-        PyErr_Format(PyExc_ValueError,
-                     "minpos must be of length 2, got %" NPY_INTP_FMT,
-                     minpos.dim(0));
-        return NULL;
+        // PyErr_Format(PyExc_ValueError,
+        //              "minpos must be of length 2, got %" NPY_INTP_FMT,
+        //              minpos.dim(0));
+        HPyErr_SetString(ctx, ctx->h_ValueError,
+                     "minpos must be of length 2");
+        return HPy_NULL;
     }
 
     extent_limits e;
 
     if (ignore) {
-        CALL_CPP("update_path_extents", reset_limits(e));
+        CALL_CPP_HPY(ctx, "update_path_extents", reset_limits(e));
     } else {
         if (rect.x1 > rect.x2) {
             e.x0 = std::numeric_limits<double>::infinity();
@@ -240,7 +280,7 @@ static PyObject *Py_update_path_extents(PyObject *self, PyObject *args, PyObject
         e.ym = minpos(1);
     }
 
-    CALL_CPP("update_path_extents", (update_path_extents(path, trans, e)));
+    CALL_CPP_HPY(ctx, "update_path_extents", (update_path_extents(path, trans, e)));
 
     changed = (e.x0 != rect.x1 || e.y0 != rect.y1 || e.x1 != rect.x2 || e.y1 != rect.y2 ||
                e.xm != minpos(0) || e.ym != minpos(1));
@@ -257,8 +297,9 @@ static PyObject *Py_update_path_extents(PyObject *self, PyObject *args, PyObject
     outminpos(0) = e.xm;
     outminpos(1) = e.ym;
 
-    return Py_BuildValue(
-        "NNi", outextents.pyobj(), outminpos.pyobj(), changed);
+    return HPy_BuildValue(ctx, "OOi", 
+                                HPy_FromPyObject(ctx, outextents.pyobj()), 
+                                HPy_FromPyObject(ctx, outminpos.pyobj()), changed);
 }
 
 const char *Py_get_path_collection_extents__doc__ =
@@ -266,40 +307,49 @@ const char *Py_get_path_collection_extents__doc__ =
     "master_transform, paths, transforms, offsets, offset_transform)\n"
     "--\n\n";
 
-static PyObject *Py_get_path_collection_extents(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_get_path_collection_extents(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_master_transform = HPy_NULL;
+    HPy h_paths = HPy_NULL;
+    HPy h_transforms = HPy_NULL;
+    HPy h_offsets = HPy_NULL;
+    HPy h_offset_trans = HPy_NULL;
     agg::trans_affine master_transform;
-    PyObject *pathsobj;
     numpy::array_view<const double, 3> transforms;
     numpy::array_view<const double, 2> offsets;
     agg::trans_affine offset_trans;
     extent_limits e;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&OO&O&O&:get_path_collection_extents",
-                          &convert_trans_affine,
-                          &master_transform,
-                          &pathsobj,
-                          &convert_transforms,
-                          &transforms,
-                          &convert_points,
-                          &offsets,
-                          &convert_trans_affine,
-                          &offset_trans)) {
-        return NULL;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "OOOOO:get_path_collection_extents",
+                          &h_master_transform,
+                          &h_paths,
+                          &h_transforms,
+                          &h_offsets,
+                          &h_offset_trans)) {
+        return HPy_NULL;
     }
+
+    if (!convert_trans_affine_hpy(ctx, h_master_transform, &master_transform)
+                || !convert_transforms_hpy(ctx, h_transforms, &transforms)
+                || !convert_points_hpy(ctx, h_offsets, &offsets)
+                || !convert_trans_affine_hpy(ctx, h_offset_trans, &offset_trans)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "get_path_collection_extents"); // TODO
+        return HPy_NULL;
+    }
+
 
     try
     {
-        py::PathGenerator paths(pathsobj);
+        py::PathGenerator paths(ctx, h_paths);
 
-        CALL_CPP("get_path_collection_extents",
+        CALL_CPP_HPY(ctx, "get_path_collection_extents",
                  (get_path_collection_extents(
                      master_transform, paths, transforms, offsets, offset_trans, e)));
     }
     catch (const py::exception &)
     {
-        return NULL;
+        return HPy_NULL;
     }
 
     npy_intp dims[] = { 2, 2 };
@@ -314,7 +364,9 @@ static PyObject *Py_get_path_collection_extents(PyObject *self, PyObject *args, 
     minpos(0) = e.xm;
     minpos(1) = e.ym;
 
-    return Py_BuildValue("NN", extents.pyobj(), minpos.pyobj());
+    return HPy_BuildValue(ctx, "OO", 
+                                HPy_FromPyObject(ctx, extents.pyobj()), 
+                                HPy_FromPyObject(ctx, minpos.pyobj()));
 }
 
 const char *Py_point_in_path_collection__doc__ =
@@ -323,44 +375,55 @@ const char *Py_point_in_path_collection__doc__ =
     "offset_trans, filled, offset_position)\n"
     "--\n\n";
 
-static PyObject *Py_point_in_path_collection(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_point_in_path_collection(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_master_transform = HPy_NULL;
+    HPy h_paths = HPy_NULL;
+    HPy h_transforms = HPy_NULL;
+    HPy h_offsets = HPy_NULL;
+    HPy h_offset_trans = HPy_NULL;
+    HPy h_filled = HPy_NULL;
     double x, y, radius;
     agg::trans_affine master_transform;
-    PyObject *pathsobj;
     numpy::array_view<const double, 3> transforms;
     numpy::array_view<const double, 2> offsets;
     agg::trans_affine offset_trans;
     bool filled;
     e_offset_position offset_position;
     std::vector<int> result;
+    HPy h_offset_position = HPy_NULL;
 
-    if (!PyArg_ParseTuple(args,
-                          "dddO&OO&O&O&O&O&:point_in_path_collection",
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "dddOOOOOOO:point_in_path_collection",
                           &x,
                           &y,
                           &radius,
-                          &convert_trans_affine,
-                          &master_transform,
-                          &pathsobj,
-                          &convert_transforms,
-                          &transforms,
-                          &convert_points,
-                          &offsets,
-                          &convert_trans_affine,
-                          &offset_trans,
-                          &convert_bool,
-                          &filled,
-                          &convert_offset_position,
-                          &offset_position)) {
-        return NULL;
+                          &h_master_transform,
+                          &h_paths,
+                          &h_transforms,
+                          &h_offsets,
+                          &h_offset_trans,
+                          &h_filled,
+                          &h_offset_position)) {
+        return HPy_NULL;
     }
+
+    if (!convert_trans_affine_hpy(ctx, h_master_transform, &master_transform)
+                || !convert_transforms_hpy(ctx, h_transforms, &transforms)
+                || !convert_points_hpy(ctx, h_offsets, &offsets)
+                || !convert_trans_affine_hpy(ctx, h_offset_trans, &offset_trans)
+                || !convert_bool_hpy(ctx, h_filled, &filled)
+                || !convert_offset_position_hpy(ctx, h_offset_position, &offset_position)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "point_in_path_collection"); // TODO
+        return HPy_NULL;
+    }
+
 
     try
     {
-        py::PathGenerator paths(pathsobj);
+        py::PathGenerator paths(ctx, h_paths);
 
-        CALL_CPP("point_in_path_collection",
+        CALL_CPP_HPY(ctx, "point_in_path_collection",
                  (point_in_path_collection(x,
                                            y,
                                            radius,
@@ -375,7 +438,7 @@ static PyObject *Py_point_in_path_collection(PyObject *self, PyObject *args, PyO
     }
     catch (const py::exception &)
     {
-        return NULL;
+        return HPy_NULL;
     }
 
     npy_intp dims[] = {(npy_intp)result.size() };
@@ -383,40 +446,48 @@ static PyObject *Py_point_in_path_collection(PyObject *self, PyObject *args, PyO
     if (result.size() > 0) {
         memcpy(pyresult.data(), &result[0], result.size() * sizeof(int));
     }
-    return pyresult.pyobj();
+    return HPy_FromPyObject(ctx, pyresult.pyobj());
 }
 
 const char *Py_path_in_path__doc__ =
     "path_in_path(path_a, trans_a, path_b, trans_b)\n"
     "--\n\n";
 
-static PyObject *Py_path_in_path(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_path_in_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_a = HPy_NULL;
+    HPy h_atrans = HPy_NULL;
+    HPy h_b = HPy_NULL;
+    HPy h_btrans = HPy_NULL;
     py::PathIterator a;
     agg::trans_affine atrans;
     py::PathIterator b;
     agg::trans_affine btrans;
     bool result;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&O&O&:path_in_path",
-                          &convert_path,
-                          &a,
-                          &convert_trans_affine,
-                          &atrans,
-                          &convert_path,
-                          &b,
-                          &convert_trans_affine,
-                          &btrans)) {
-        return NULL;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "OOOO:path_in_path",
+                          &h_a,
+                          &h_atrans,
+                          &h_b,
+                          &h_btrans)) {
+        return HPy_NULL;
     }
 
-    CALL_CPP("path_in_path", (result = path_in_path(a, atrans, b, btrans)));
+    if (!convert_path_hpy(ctx, h_a, &a)
+                || !convert_trans_affine_hpy(ctx, h_atrans, &atrans)
+                || !convert_path_hpy(ctx, h_b, &b)
+                || !convert_trans_affine_hpy(ctx, h_btrans, &btrans)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "path_in_path"); // TODO
+        return HPy_NULL;
+    }
+
+    CALL_CPP_HPY(ctx, "path_in_path", (result = path_in_path(a, atrans, b, btrans)));
 
     if (result) {
-        Py_RETURN_TRUE;
+        return HPy_Dup(ctx, ctx->h_True);
     } else {
-        Py_RETURN_FALSE;
+        return HPy_Dup(ctx, ctx->h_False);
     }
 }
 
@@ -424,49 +495,61 @@ const char *Py_clip_path_to_rect__doc__ =
     "clip_path_to_rect(path, rect, inside)\n"
     "--\n\n";
 
-static PyObject *Py_clip_path_to_rect(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_clip_path_to_rect(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_path = HPy_NULL;
+    HPy h_rect = HPy_NULL;
+    HPy h_inside = HPy_NULL;
     py::PathIterator path;
     agg::rect_d rect;
     bool inside;
     std::vector<Polygon> result;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&O&:clip_path_to_rect",
-                          &convert_path,
-                          &path,
-                          &convert_rect,
-                          &rect,
-                          &convert_bool,
-                          &inside)) {
-        return NULL;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "OOO:clip_path_to_rect",
+                          &h_path,
+                          &h_rect,
+                          &h_inside)) {
+        return HPy_NULL;
     }
 
-    CALL_CPP("clip_path_to_rect", (clip_path_to_rect(path, rect, inside, result)));
+    if (!convert_path_hpy(ctx, h_path, &path)
+                || !convert_rect_hpy(ctx, h_rect, &rect)
+                || !convert_bool_hpy(ctx, h_inside, &inside)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "clip_path_to_rect"); // TODO
+        return HPy_NULL;
+    }
 
-    return convert_polygon_vector(result);
+    CALL_CPP_HPY(ctx, "clip_path_to_rect", (clip_path_to_rect(path, rect, inside, result)));
+
+    return convert_polygon_vector(ctx, result);
 }
 
 const char *Py_affine_transform__doc__ =
     "affine_transform(points, trans)\n"
     "--\n\n";
 
-static PyObject *Py_affine_transform(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_affine_transform(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
-    PyObject *vertices_obj;
+    HPy vertices_obj = HPy_NULL;
+    HPy h_trans = HPy_NULL;
     agg::trans_affine trans;
 
-    if (!PyArg_ParseTuple(args,
-                          "OO&:affine_transform",
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "OO:affine_transform",
                           &vertices_obj,
-                          &convert_trans_affine,
-                          &trans)) {
-        return NULL;
+                          &h_trans)) {
+        return HPy_NULL;
     }
 
-    PyArrayObject* vertices_arr = (PyArrayObject *)PyArray_ContiguousFromAny(vertices_obj, NPY_DOUBLE, 1, 2);
+    if (!convert_trans_affine_hpy(ctx, h_trans, &trans)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "affine_transform"); // TODO
+        return HPy_NULL;
+    }
+
+    PyArrayObject* vertices_arr = (PyArrayObject *)PyArray_ContiguousFromAny(HPy_AsPyObject(ctx, vertices_obj), NPY_DOUBLE, 1, 2);
     if (vertices_arr == NULL) {
-        return NULL;
+        return HPy_NULL;
     }
 
     if (PyArray_NDIM(vertices_arr) == 2) {
@@ -475,16 +558,16 @@ static PyObject *Py_affine_transform(PyObject *self, PyObject *args, PyObject *k
 
         npy_intp dims[] = { (npy_intp)vertices.size(), 2 };
         numpy::array_view<double, 2> result(dims);
-        CALL_CPP("affine_transform", (affine_transform_2d(vertices, trans, result)));
-        return result.pyobj();
+        CALL_CPP_HPY(ctx, "affine_transform", (affine_transform_2d(vertices, trans, result)));
+        return HPy_FromPyObject(ctx, result.pyobj());
     } else { // PyArray_NDIM(vertices_arr) == 1
         numpy::array_view<double, 1> vertices(vertices_arr);
         Py_DECREF(vertices_arr);
 
         npy_intp dims[] = { (npy_intp)vertices.size() };
         numpy::array_view<double, 1> result(dims);
-        CALL_CPP("affine_transform", (affine_transform_1d(vertices, trans, result)));
-        return result.pyobj();
+        CALL_CPP_HPY(ctx, "affine_transform", (affine_transform_1d(vertices, trans, result)));
+        return HPy_FromPyObject(ctx, result.pyobj());
     }
 }
 
@@ -492,33 +575,41 @@ const char *Py_count_bboxes_overlapping_bbox__doc__ =
     "count_bboxes_overlapping_bbox(bbox, bboxes)\n"
     "--\n\n";
 
-static PyObject *Py_count_bboxes_overlapping_bbox(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_count_bboxes_overlapping_bbox(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_bbox = HPy_NULL;
+    HPy h_bboxes = HPy_NULL;
     agg::rect_d bbox;
     numpy::array_view<const double, 3> bboxes;
     int result;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&:count_bboxes_overlapping_bbox",
-                          &convert_rect,
-                          &bbox,
-                          &convert_bboxes,
-                          &bboxes)) {
-        return NULL;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "OO:count_bboxes_overlapping_bbox",
+                          &h_bbox,
+                          &h_bboxes)) {
+        return HPy_NULL;
     }
 
-    CALL_CPP("count_bboxes_overlapping_bbox",
+    if (!convert_rect_hpy(ctx, h_bbox, &bbox)
+                || !convert_bboxes_hpy(ctx, h_bboxes, &bboxes)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "count_bboxes_overlapping_bbox"); // TODO
+        return HPy_NULL;
+    }
+
+    CALL_CPP_HPY(ctx, "count_bboxes_overlapping_bbox",
              (result = count_bboxes_overlapping_bbox(bbox, bboxes)));
 
-    return PyLong_FromLong(result);
+    return HPyLong_FromLong(ctx, result);
 }
 
 const char *Py_path_intersects_path__doc__ =
     "path_intersects_path(path1, path2, filled=False)\n"
     "--\n\n";
 
-static PyObject *Py_path_intersects_path(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_path_intersects_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
 {
+    HPy h_p1 = HPy_NULL;
+    HPy h_p2 = HPy_NULL;
     py::PathIterator p1;
     py::PathIterator p2;
     agg::trans_affine t1;
@@ -527,35 +618,44 @@ static PyObject *Py_path_intersects_path(PyObject *self, PyObject *args, PyObjec
     const char *names[] = { "p1", "p2", "filled", NULL };
     bool result;
 
-    if (!PyArg_ParseTupleAndKeywords(args,
+    HPyTracker ht;
+    if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
                                      kwds,
-                                     "O&O&i:path_intersects_path",
-                                     (char **)names,
-                                     &convert_path,
-                                     &p1,
-                                     &convert_path,
-                                     &p2,
+                                     "OOi:path_intersects_path",
+                                     (const char **)names,
+                                     &h_p1,
+                                     &h_p2,
                                      &filled)) {
-        return NULL;
+        return HPy_NULL;
     }
 
-    CALL_CPP("path_intersects_path", (result = path_intersects_path(p1, p2)));
+    if (!convert_path_hpy(ctx, h_p1, &p1)
+                || !convert_path_hpy(ctx, h_p2, &p2)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "path_intersects_path"); // TODO
+        goto error;
+    }
+
+    CALL_CPP_HPY(ctx, "path_intersects_path", (result = path_intersects_path(p1, p2)));
     if (filled) {
         if (!result) {
-            CALL_CPP("path_intersects_path",
+            CALL_CPP_HPY(ctx, "path_intersects_path",
                      (result = path_in_path(p1, t1, p2, t2)));
         }
         if (!result) {
-            CALL_CPP("path_intersects_path",
+            CALL_CPP_HPY(ctx, "path_intersects_path",
                      (result = path_in_path(p2, t1, p1, t2)));
         }
     }
 
+    HPyTracker_Close(ctx, ht);
     if (result) {
-        Py_RETURN_TRUE;
+        return HPy_Dup(ctx, ctx->h_True);
     } else {
-        Py_RETURN_FALSE;
+        return HPy_Dup(ctx, ctx->h_False);
     }
+error:
+    HPyTracker_Close(ctx, ht);
+    return HPy_NULL;
 }
 
 const char *Py_path_intersects_rectangle__doc__ =
@@ -563,44 +663,57 @@ const char *Py_path_intersects_rectangle__doc__ =
     "path, rect_x1, rect_y1, rect_x2, rect_y2, filled=False)\n"
     "--\n\n";
 
-static PyObject *Py_path_intersects_rectangle(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_path_intersects_rectangle(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
 {
+    HPy h_path = HPy_NULL;
+    HPy h_filled = HPy_NULL;
     py::PathIterator path;
     double rect_x1, rect_y1, rect_x2, rect_y2;
     bool filled = false;
     const char *names[] = { "path", "rect_x1", "rect_y1", "rect_x2", "rect_y2", "filled", NULL };
     bool result;
 
-    if (!PyArg_ParseTupleAndKeywords(args,
+    HPyTracker ht;
+    if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
                                      kwds,
-                                     "O&dddd|O&:path_intersects_rectangle",
-                                     (char **)names,
-                                     &convert_path,
-                                     &path,
+                                     "Odddd|O:path_intersects_rectangle",
+                                     (const char **)names,
+                                     &h_path,
                                      &rect_x1,
                                      &rect_y1,
                                      &rect_x2,
                                      &rect_y2,
-                                     &convert_bool,
-                                     &filled)) {
-        return NULL;
+                                     &h_filled)) {
+        return HPy_NULL;
     }
 
-    CALL_CPP("path_intersects_rectangle", (result = path_intersects_rectangle(path, rect_x1, rect_y1, rect_x2, rect_y2, filled)));
+    if (!convert_path_hpy(ctx, h_path, &path)
+                || (!HPy_IsNull(h_filled) && !convert_bool_hpy(ctx, h_filled, &filled))) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "path_intersects_rectangle"); // TODO
+        goto error;
+    }
 
+    CALL_CPP_HPY(ctx, "path_intersects_rectangle", (result = path_intersects_rectangle(path, rect_x1, rect_y1, rect_x2, rect_y2, filled)));
+
+    HPyTracker_Close(ctx, ht);
     if (result) {
-        Py_RETURN_TRUE;
+        return HPy_Dup(ctx, ctx->h_True);
     } else {
-        Py_RETURN_FALSE;
+        return HPy_Dup(ctx, ctx->h_False);
     }
+error:
+    HPyTracker_Close(ctx, ht);
+    return HPy_NULL;
 }
 
 const char *Py_convert_path_to_polygons__doc__ =
     "convert_path_to_polygons(path, trans, width=0, height=0)\n"
     "--\n\n";
 
-static PyObject *Py_convert_path_to_polygons(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_convert_path_to_polygons(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
 {
+    HPy h_path = HPy_NULL;
+    HPy h_trans = HPy_NULL;
     py::PathIterator path;
     agg::trans_affine trans;
     double width = 0.0, height = 0.0;
@@ -608,24 +721,33 @@ static PyObject *Py_convert_path_to_polygons(PyObject *self, PyObject *args, PyO
     std::vector<Polygon> result;
     const char *names[] = { "path", "transform", "width", "height", "closed_only", NULL };
 
-    if (!PyArg_ParseTupleAndKeywords(args,
+    HPyTracker ht;
+    if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
                                      kwds,
-                                     "O&O&|ddi:convert_path_to_polygons",
-                                     (char **)names,
-                                     &convert_path,
-                                     &path,
-                                     &convert_trans_affine,
-                                     &trans,
+                                     "OO|ddi:convert_path_to_polygons",
+                                     (const char **)names,
+                                     &h_path,
+                                     &h_trans,
                                      &width,
                                      &height,
                                      &closed_only)) {
-        return NULL;
+        return HPy_NULL;
     }
 
-    CALL_CPP("convert_path_to_polygons",
+    if (!convert_path_hpy(ctx, h_path, &path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "convert_path_to_polygons"); // TODO
+        goto error;
+    }
+
+    CALL_CPP_HPY(ctx, "convert_path_to_polygons",
              (convert_path_to_polygons(path, trans, width, height, closed_only, result)));
 
-    return convert_polygon_vector(result);
+    HPyTracker_Close(ctx, ht);
+    return convert_polygon_vector(ctx, result);
+error:
+    HPyTracker_Close(ctx, ht);
+    return HPy_NULL;
 }
 
 const char *Py_cleanup_path__doc__ =
@@ -634,47 +756,58 @@ const char *Py_cleanup_path__doc__ =
     "return_curves, sketch)\n"
     "--\n\n";
 
-static PyObject *Py_cleanup_path(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_cleanup_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_path = HPy_NULL;
+    HPy h_trans = HPy_NULL;
+    HPy h_remove_nans = HPy_NULL;
+    HPy h_clip_rect = HPy_NULL;
+    HPy h_snap_mode = HPy_NULL;
+    HPy h_return_curves = HPy_NULL;
+    HPy h_sketch = HPy_NULL;
     py::PathIterator path;
     agg::trans_affine trans;
     bool remove_nans;
     agg::rect_d clip_rect;
     e_snap_mode snap_mode;
     double stroke_width;
-    PyObject *simplifyobj;
+    HPy simplifyobj;
     bool simplify = false;
     bool return_curves;
     SketchParams sketch;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&O&O&O&dOO&O&:cleanup_path",
-                          &convert_path,
-                          &path,
-                          &convert_trans_affine,
-                          &trans,
-                          &convert_bool,
-                          &remove_nans,
-                          &convert_rect,
-                          &clip_rect,
-                          &convert_snap,
-                          &snap_mode,
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "OOOOOdOOO:cleanup_path",
+                          &h_path,
+                          &h_trans,
+                          &h_remove_nans,
+                          &h_clip_rect,
+                          &h_snap_mode,
                           &stroke_width,
                           &simplifyobj,
-                          &convert_bool,
-                          &return_curves,
-                          &convert_sketch_params,
-                          &sketch)) {
-        return NULL;
+                          &h_return_curves,
+                          &h_sketch)) {
+        return HPy_NULL;
     }
 
-    if (simplifyobj == Py_None) {
+    if (!convert_path_hpy(ctx, h_path, &path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)
+                || !convert_bool_hpy(ctx, h_remove_nans, &remove_nans)
+                || !convert_rect_hpy(ctx, h_clip_rect, &clip_rect)
+                || !convert_snap_hpy(ctx, h_snap_mode, &snap_mode)
+                || !convert_bool_hpy(ctx, h_return_curves, &return_curves)
+                || !convert_sketch_params_hpy(ctx, h_sketch, &sketch)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "cleanup_path"); // TODO
+        return HPy_NULL;
+    }
+
+    if (HPy_Is(ctx, simplifyobj, ctx->h_None)) {
         simplify = path.should_simplify();
     } else {
-        switch (PyObject_IsTrue(simplifyobj)) {
+        switch (HPy_IsTrue(ctx, simplifyobj)) {
             case 0: simplify = false; break;
             case 1: simplify = true; break;
-            default: return NULL;  // errored.
+            default: return HPy_NULL;  // errored.
         }
     }
 
@@ -683,7 +816,7 @@ static PyObject *Py_cleanup_path(PyObject *self, PyObject *args, PyObject *kwds)
     std::vector<double> vertices;
     std::vector<npy_uint8> codes;
 
-    CALL_CPP("cleanup_path",
+    CALL_CPP_HPY(ctx, "cleanup_path",
              (cleanup_path(path,
                            trans,
                            remove_nans,
@@ -708,7 +841,9 @@ static PyObject *Py_cleanup_path(PyObject *self, PyObject *args, PyObject *kwds)
     memcpy(pyvertices.data(), &vertices[0], sizeof(double) * 2 * length);
     memcpy(pycodes.data(), &codes[0], sizeof(unsigned char) * length);
 
-    return Py_BuildValue("NN", pyvertices.pyobj(), pycodes.pyobj());
+    return HPy_BuildValue(ctx, "OO", 
+                            HPy_FromPyObject(ctx, pyvertices.pyobj()), 
+                            HPy_FromPyObject(ctx, pycodes.pyobj()));
 }
 
 const char *Py_convert_to_string__doc__ =
@@ -741,12 +876,18 @@ const char *Py_convert_to_string__doc__ =
     "    Whether the opcode comes after the values (True) or before (False).\n"
     ;
 
-static PyObject *Py_convert_to_string(PyObject *self, PyObject *args, PyObject *kwds)
+static HPy Py_convert_to_string(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_path = HPy_NULL;
+    HPy h_trans = HPy_NULL;
+    HPy h_cliprect = HPy_NULL;
+    HPy h_sketch = HPy_NULL;
+    HPy h_postfix = HPy_NULL;
+    HPy h_codes = HPy_NULL;
     py::PathIterator path;
     agg::trans_affine trans;
     agg::rect_d cliprect;
-    PyObject *simplifyobj;
+    HPy simplifyobj;
     bool simplify = false;
     SketchParams sketch;
     int precision;
@@ -755,49 +896,71 @@ static PyObject *Py_convert_to_string(PyObject *self, PyObject *args, PyObject *
     std::string buffer;
     bool status;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&O&OO&i(yyyyy)O&:convert_to_string",
-                          &convert_path,
-                          &path,
-                          &convert_trans_affine,
-                          &trans,
-                          &convert_rect,
-                          &cliprect,
+
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, 
+                          "OOOOOiOO:convert_to_string",
+                          &h_path,
+                          &h_trans,
+                          &h_cliprect,
                           &simplifyobj,
-                          &convert_sketch_params,
-                          &sketch,
+                          &h_sketch,
                           &precision,
-                          &codes[0],
-                          &codes[1],
-                          &codes[2],
-                          &codes[3],
-                          &codes[4],
-                          &convert_bool,
-                          &postfix)) {
-        return NULL;
+                          &h_codes,
+                          &h_postfix)) {
+        return HPy_NULL;
     }
 
-    if (simplifyobj == Py_None) {
+    if (!convert_path_hpy(ctx, h_path, &path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)
+                || !convert_rect_hpy(ctx, h_cliprect, &cliprect)
+                || !convert_sketch_params_hpy(ctx, h_sketch, &sketch)
+                || !convert_bool_hpy(ctx, h_postfix, &postfix)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "convert_to_string"); // TODO
+        return HPy_NULL;
+    }
+
+    if (!HPyTuple_Check(ctx, h_codes) && !HPyList_Check(ctx, h_codes)) { // (yyyyy) not supported
+        HPyErr_SetString(ctx, ctx->h_TypeError, "convert_to_string");
+        return HPy_NULL;
+    }
+
+    HPy_ssize_t codes_len = HPy_Length(ctx, h_codes);
+    if (codes_len != 5) {
+        HPyErr_SetString(ctx, ctx->h_ValueError, "convert_to_string");
+        return HPy_NULL;
+    }
+
+    for (HPy_ssize_t i=0; i < codes_len; i++) {
+        HPy item = HPy_GetItem_i(ctx, h_codes, i);
+        if (!HPyBytes_Check(ctx, item)) {
+            HPyErr_SetString(ctx, ctx->h_TypeError, "convert_to_string");
+            return HPy_NULL;
+        }
+        codes[i] = HPyBytes_AsString(ctx, item);
+        HPy_Close(ctx, item);
+    }
+
+    if (HPy_Is(ctx, simplifyobj, ctx->h_None)) {
         simplify = path.should_simplify();
     } else {
-        switch (PyObject_IsTrue(simplifyobj)) {
+        switch (HPy_IsTrue(ctx, simplifyobj)) {
             case 0: simplify = false; break;
             case 1: simplify = true; break;
-            default: return NULL;  // errored.
+            default: return HPy_NULL;  // errored.
         }
     }
 
-    CALL_CPP("convert_to_string",
+    CALL_CPP_HPY(ctx, "convert_to_string",
              (status = convert_to_string(
                  path, trans, cliprect, simplify, sketch,
                  precision, codes, postfix, buffer)));
 
     if (!status) {
-        PyErr_SetString(PyExc_ValueError, "Malformed path codes");
-        return NULL;
+        HPyErr_SetString(ctx, ctx->h_ValueError, "Malformed path codes");
+        return HPy_NULL;
     }
 
-    return PyBytes_FromStringAndSize(buffer.c_str(), buffer.size());
+    return HPyBytes_FromStringAndSize(ctx, buffer.c_str(), buffer.size());
 }
 
 
@@ -806,23 +969,23 @@ const char *Py_is_sorted__doc__ =
     "--\n\n"
     "Return whether the 1D *array* is monotonically increasing, ignoring NaNs.\n";
 
-static PyObject *Py_is_sorted(PyObject *self, PyObject *obj)
+static HPy Py_is_sorted(HPyContext *ctx, HPy self, HPy obj)
 {
     npy_intp size;
     bool result;
 
     PyArrayObject *array = (PyArrayObject *)PyArray_FromAny(
-        obj, NULL, 1, 1, 0, NULL);
+        HPy_AsPyObject(ctx, obj), NULL, 1, 1, 0, NULL);
 
     if (array == NULL) {
-        return NULL;
+        return HPy_NULL;
     }
 
     size = PyArray_DIM(array, 0);
 
     if (size < 2) {
         Py_DECREF(array);
-        Py_RETURN_TRUE;
+        return HPy_Dup(ctx, ctx->h_True);
     }
 
     /* Handle just the most common types here, otherwise coerce to
@@ -866,10 +1029,10 @@ static PyObject *Py_is_sorted(PyObject *self, PyObject *obj)
     default:
         {
             Py_DECREF(array);
-            array = (PyArrayObject *)PyArray_FromObject(obj, NPY_DOUBLE, 1, 1);
+            array = (PyArrayObject *)PyArray_FromObject(HPy_AsPyObject(ctx, obj), NPY_DOUBLE, 1, 1);
 
             if (array == NULL) {
-                return NULL;
+                return HPy_NULL;
             }
 
             _is_sorted<npy_double> is_sorted;
@@ -880,61 +1043,88 @@ static PyObject *Py_is_sorted(PyObject *self, PyObject *obj)
     Py_DECREF(array);
 
     if (result) {
-        Py_RETURN_TRUE;
+        return HPy_Dup(ctx, ctx->h_True);
     } else {
-        Py_RETURN_FALSE;
+        return HPy_Dup(ctx, ctx->h_False);
     }
 }
 
 
-static PyMethodDef module_functions[] = {
-    {"point_in_path", (PyCFunction)Py_point_in_path, METH_VARARGS, Py_point_in_path__doc__},
-    {"points_in_path", (PyCFunction)Py_points_in_path, METH_VARARGS, Py_points_in_path__doc__},
-    {"point_on_path", (PyCFunction)Py_point_on_path, METH_VARARGS, Py_point_on_path__doc__},
-    {"points_on_path", (PyCFunction)Py_points_on_path, METH_VARARGS, Py_points_on_path__doc__},
-    {"get_path_extents", (PyCFunction)Py_get_path_extents, METH_VARARGS, Py_get_path_extents__doc__},
-    {"update_path_extents", (PyCFunction)Py_update_path_extents, METH_VARARGS, Py_update_path_extents__doc__},
-    {"get_path_collection_extents", (PyCFunction)Py_get_path_collection_extents, METH_VARARGS, Py_get_path_collection_extents__doc__},
-    {"point_in_path_collection", (PyCFunction)Py_point_in_path_collection, METH_VARARGS, Py_point_in_path_collection__doc__},
-    {"path_in_path", (PyCFunction)Py_path_in_path, METH_VARARGS, Py_path_in_path__doc__},
-    {"clip_path_to_rect", (PyCFunction)Py_clip_path_to_rect, METH_VARARGS, Py_clip_path_to_rect__doc__},
-    {"affine_transform", (PyCFunction)Py_affine_transform, METH_VARARGS, Py_affine_transform__doc__},
-    {"count_bboxes_overlapping_bbox", (PyCFunction)Py_count_bboxes_overlapping_bbox, METH_VARARGS, Py_count_bboxes_overlapping_bbox__doc__},
-    {"path_intersects_path", (PyCFunction)Py_path_intersects_path, METH_VARARGS|METH_KEYWORDS, Py_path_intersects_path__doc__},
-    {"path_intersects_rectangle", (PyCFunction)Py_path_intersects_rectangle, METH_VARARGS|METH_KEYWORDS, Py_path_intersects_rectangle__doc__},
-    {"convert_path_to_polygons", (PyCFunction)Py_convert_path_to_polygons, METH_VARARGS|METH_KEYWORDS, Py_convert_path_to_polygons__doc__},
-    {"cleanup_path", (PyCFunction)Py_cleanup_path, METH_VARARGS, Py_cleanup_path__doc__},
-    {"convert_to_string", (PyCFunction)Py_convert_to_string, METH_VARARGS, Py_convert_to_string__doc__},
-    {"is_sorted", (PyCFunction)Py_is_sorted, METH_O, Py_is_sorted__doc__},
-    {NULL}
-};
+HPyDef_METH(Py_point_in_path_def, "point_in_path", Py_point_in_path, HPyFunc_VARARGS, .doc = Py_point_in_path__doc__);
+HPyDef_METH(Py_points_in_path_def, "points_in_path", Py_points_in_path, HPyFunc_VARARGS, .doc = Py_points_in_path__doc__);
+HPyDef_METH(Py_point_on_path_def, "point_on_path", Py_point_on_path, HPyFunc_VARARGS, .doc = Py_point_on_path__doc__);
+HPyDef_METH(Py_points_on_path_def, "points_on_path", Py_points_on_path, HPyFunc_VARARGS, .doc = Py_points_on_path__doc__);
+HPyDef_METH(Py_get_path_extents_def, "get_path_extents", Py_get_path_extents, HPyFunc_VARARGS, .doc = Py_get_path_extents__doc__);
+HPyDef_METH(Py_update_path_extents_def, "update_path_extents", Py_update_path_extents, HPyFunc_VARARGS, .doc = Py_update_path_extents__doc__);
+HPyDef_METH(Py_get_path_collection_extents_def, "get_path_collection_extents", Py_get_path_collection_extents, HPyFunc_VARARGS, .doc = Py_get_path_collection_extents__doc__);
+HPyDef_METH(Py_point_in_path_collection_def, "point_in_path_collection", Py_point_in_path_collection, HPyFunc_VARARGS, .doc = Py_point_in_path_collection__doc__);
+HPyDef_METH(Py_path_in_path_def, "path_in_path", Py_path_in_path, HPyFunc_VARARGS, .doc = Py_path_in_path__doc__);
+HPyDef_METH(Py_clip_path_to_rect_def, "clip_path_to_rect", Py_clip_path_to_rect, HPyFunc_VARARGS, .doc = Py_clip_path_to_rect__doc__);
+HPyDef_METH(Py_affine_transform_def, "affine_transform", Py_affine_transform, HPyFunc_VARARGS, .doc = Py_affine_transform__doc__);
+HPyDef_METH(Py_count_bboxes_overlapping_bbox_def, "count_bboxes_overlapping_bbox", Py_count_bboxes_overlapping_bbox, HPyFunc_VARARGS, .doc = Py_count_bboxes_overlapping_bbox__doc__);
+HPyDef_METH(Py_path_intersects_path_def, "path_intersects_path", Py_path_intersects_path, HPyFunc_KEYWORDS, .doc = Py_path_intersects_path__doc__);
+HPyDef_METH(Py_path_intersects_rectangle_def, "path_intersects_rectangle", Py_path_intersects_rectangle, HPyFunc_KEYWORDS, .doc = Py_path_intersects_rectangle__doc__);
+HPyDef_METH(Py_convert_path_to_polygons_def, "convert_path_to_polygons", Py_convert_path_to_polygons, HPyFunc_KEYWORDS, .doc = Py_convert_path_to_polygons__doc__);
+HPyDef_METH(Py_cleanup_path_def, "cleanup_path", Py_cleanup_path, HPyFunc_VARARGS, .doc = Py_cleanup_path__doc__);
+HPyDef_METH(Py_convert_to_string_def, "convert_to_string", Py_convert_to_string, HPyFunc_VARARGS, .doc = Py_convert_to_string__doc__);
+HPyDef_METH(Py_is_sorted_def, "is_sorted", Py_is_sorted, HPyFunc_O, .doc = Py_is_sorted__doc__);
 
-static struct PyModuleDef moduledef = {
-    PyModuleDef_HEAD_INIT,
-    "_path",
-    NULL,
-    0,
-    module_functions,
-    NULL,
-    NULL,
-    NULL,
+static HPyDef *module_defines[] = {
+    &Py_point_in_path_def,
+    &Py_points_in_path_def,
+    &Py_point_on_path_def,
+    &Py_points_on_path_def,
+    &Py_get_path_extents_def,
+    &Py_update_path_extents_def,
+    &Py_get_path_collection_extents_def,
+    &Py_point_in_path_collection_def,
+    &Py_path_in_path_def,
+    &Py_clip_path_to_rect_def,
+    &Py_affine_transform_def,
+    &Py_count_bboxes_overlapping_bbox_def,
+    &Py_path_intersects_path_def,
+    &Py_path_intersects_rectangle_def,
+    &Py_convert_path_to_polygons_def,
+    &Py_cleanup_path_def,
+    &Py_convert_to_string_def,
+    &Py_is_sorted_def,
     NULL
 };
 
+static HPyModuleDef moduledef = {
+  .name = "_path",
+  .doc = NULL,
+  .size = 0,
+  .defines = module_defines,
+};
+
+
+// Logic is from NumPy's import_array()
+static int npy_import_array_hpy(HPyContext *ctx) {
+    if (_import_array() < 0) {
+        // HPyErr_Print(ctx); TODO
+        HPyErr_SetString(ctx, ctx->h_ImportError, "numpy.core.multiarray failed to import"); 
+        return 0; 
+    }
+    return 1;
+}
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #pragma GCC visibility push(default)
-
-PyMODINIT_FUNC PyInit__path(void)
+HPy_MODINIT(_path)
+static HPy init__path_impl(HPyContext *ctx)
 {
-    PyObject *m;
-    m = PyModule_Create(&moduledef);
-
-    if (m == NULL) {
-        return NULL;
+    if (!npy_import_array_hpy(ctx)) {
+        return HPy_NULL;
     }
 
-    import_array();
-
-    return m;
+    return HPyModule_Create(ctx, &moduledef);
 }
 
 #pragma GCC visibility pop
+#ifdef __cplusplus
+}
+#endif
