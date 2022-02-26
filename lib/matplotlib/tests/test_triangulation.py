@@ -1054,7 +1054,7 @@ def test_internal_cpp_api():
     # C++ Triangulation.
     with pytest.raises(
             TypeError,
-            match=r'function takes exactly 7 arguments \(0 given\)'):
+            match=r'function required positional argument missing'):
         mpl._tri.Triangulation()
 
     with pytest.raises(
@@ -1102,17 +1102,17 @@ def test_internal_cpp_api():
     # C++ TriContourGenerator.
     with pytest.raises(
             TypeError,
-            match=r'function takes exactly 2 arguments \(0 given\)'):
+            match=r'function required positional argument missing'):
         mpl._tri.TriContourGenerator()
 
     with pytest.raises(
             ValueError,
             match=r'z must be a 1D array with the same length as the x and y '
                   r'arrays'):
-        mpl._tri.TriContourGenerator(triang, [1])
+        mpl._tri.TriContourGenerator(triang, mpl._tri, [1])
 
     z = [0, 1, 2]
-    tcg = mpl._tri.TriContourGenerator(triang, z)
+    tcg = mpl._tri.TriContourGenerator(triang, mpl._tri, z)
 
     with pytest.raises(
             ValueError, match=r'filled contour levels must be increasing'):
@@ -1120,10 +1120,10 @@ def test_internal_cpp_api():
 
     # C++ TrapezoidMapTriFinder.
     with pytest.raises(
-            TypeError, match=r'function takes exactly 1 argument \(0 given\)'):
+            TypeError, match=r'function required positional argument missing'):
         mpl._tri.TrapezoidMapTriFinder()
 
-    trifinder = mpl._tri.TrapezoidMapTriFinder(triang)
+    trifinder = mpl._tri.TrapezoidMapTriFinder(triang, mpl._tri)
 
     with pytest.raises(
             ValueError, match=r'x and y must be array-like with same shape'):

@@ -600,9 +600,9 @@ void TriContourGenerator::clear_visited_flags(bool include_boundaries)
     }
 }
 
-PyObject* TriContourGenerator::contour_to_segs(const Contour& contour)
+HPy TriContourGenerator::contour_to_segs(HPyContext *ctx, const Contour& contour)
 {
-    PyObject* segs = PyList_New(contour.size());
+    HPyListBuilder segs = HPyListBuilder_New(ctx, contour.size());
     for (Contour::size_type i = 0; i < contour.size(); ++i) {
         const ContourLine& line = contour[i];
         npy_intp dims[2] = {static_cast<npy_intp>(line.size()),2};
@@ -613,17 +613,12 @@ PyObject* TriContourGenerator::contour_to_segs(const Contour& contour)
             *p++ = it->x;
             *p++ = it->y;
         }
-        if (PyList_SetItem(segs, i, (PyObject*)py_line)) {
-            Py_XDECREF(segs);
-            PyErr_SetString(PyExc_RuntimeError,
-                            "Unable to set contour segments");
-            return NULL;
-        }
+        HPyListBuilder_Set(ctx, segs, i, HPy_FromPyObject(ctx, (cpy_PyObject*)py_line));
     }
-    return segs;
+    return HPyListBuilder_Build(ctx, segs);
 }
 
-PyObject* TriContourGenerator::contour_to_segs_and_kinds(const Contour& contour)
+HPy TriContourGenerator::contour_to_segs_and_kinds(HPyContext *ctx, const Contour& contour)
 {
     Contour::const_iterator line;
     ContourLine::const_iterator point;
@@ -653,18 +648,20 @@ PyObject* TriContourGenerator::contour_to_segs_and_kinds(const Contour& contour)
         }
     }
 
-    PyObject* result = PyTuple_New(2);
-    if (PyTuple_SetItem(result, 0, (PyObject*)segs) ||
-        PyTuple_SetItem(result, 1, (PyObject*)kinds)) {
-        Py_XDECREF(result);
-        PyErr_SetString(PyExc_RuntimeError,
+    HPy tuple[] = {
+        HPy_FromPyObject(ctx, (cpy_PyObject*)segs), 
+        HPy_FromPyObject(ctx, (cpy_PyObject*)kinds)
+    };
+    HPy result = HPyTuple_FromArray(ctx, tuple, 2);
+    if (HPy_IsNull(result)) {
+        HPyErr_SetString(ctx, ctx->h_RuntimeError,
                         "Unable to set contour segments and kinds");
-        return NULL;
+        return HPy_NULL;
     }
     return result;
 }
 
-PyObject* TriContourGenerator::create_contour(const double& level)
+HPy TriContourGenerator::create_contour(HPyContext *ctx, const double& level)
 {
     clear_visited_flags(false);
     Contour contour;
@@ -672,10 +669,10 @@ PyObject* TriContourGenerator::create_contour(const double& level)
     find_boundary_lines(contour, level);
     find_interior_lines(contour, level, false, false);
 
-    return contour_to_segs(contour);
+    return contour_to_segs(ctx, contour);
 }
 
-PyObject* TriContourGenerator::create_filled_contour(const double& lower_level,
+HPy TriContourGenerator::create_filled_contour(HPyContext *ctx, const double& lower_level,
                                                      const double& upper_level)
 {
     clear_visited_flags(true);
@@ -685,7 +682,7 @@ PyObject* TriContourGenerator::create_filled_contour(const double& lower_level,
     find_interior_lines(contour, lower_level, false, true);
     find_interior_lines(contour, upper_level, true,  true);
 
-    return contour_to_segs_and_kinds(contour);
+    return contour_to_segs_and_kinds(ctx, contour);
 }
 
 XY TriContourGenerator::edge_interp(int tri, int edge, const double& level)
@@ -1298,13 +1295,13 @@ TrapezoidMapTriFinder::find_trapezoids_intersecting_edge(
     return true;
 }
 
-PyObject*
-TrapezoidMapTriFinder::get_tree_stats()
+HPy
+TrapezoidMapTriFinder::get_tree_stats(HPyContext *ctx)
 {
     NodeStats stats;
     _tree->get_stats(0, stats);
 
-    return Py_BuildValue("[l,l,l,l,l,l,d]",
+    return HPy_BuildValue(ctx, "[l,l,l,l,l,l,d]",
                          stats.node_count,
                          stats.unique_nodes.size(),
                          stats.trapezoid_count,

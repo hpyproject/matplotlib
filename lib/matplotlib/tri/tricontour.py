@@ -39,7 +39,7 @@ class TriContourSet(ContourSet):
         else:
             from matplotlib import _tri
             tri, z = self._contour_args(args, kwargs)
-            C = _tri.TriContourGenerator(tri.get_cpp_triangulation(), z)
+            C = _tri.TriContourGenerator(tri.get_cpp_triangulation(), _tri, z)
             self._mins = [tri.x.min(), tri.y.min()]
             self._maxs = [tri.x.max(), tri.y.max()]
 
