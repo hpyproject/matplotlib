@@ -42,7 +42,7 @@ from matplotlib.mathtext import MathTextParser
 from matplotlib.path import Path
 from matplotlib.transforms import Bbox, BboxBase
 from matplotlib.backends._backend_agg import RendererAgg as _RendererAgg
-
+from matplotlib.backends import _backend_agg
 
 backend_version = 'v2.2'
 
@@ -336,11 +336,11 @@ class RendererAgg(RendererBase):
 
             # The incoming data is float, but the _renderer type-checking wants
             # to see integers.
-            self._renderer.restore_region(region, int(x1), int(y1),
+            self._renderer.restore_region(region, _backend_agg, int(x1), int(y1),
                                           int(x2), int(y2), int(ox), int(oy))
 
         else:
-            self._renderer.restore_region(region)
+            self._renderer.restore_region(region, _backend_agg)
 
     def start_filter(self):
         """
@@ -390,7 +390,7 @@ class FigureCanvasAgg(FigureCanvasBase):
 
     def copy_from_bbox(self, bbox):
         renderer = self.get_renderer()
-        return renderer.copy_from_bbox(bbox)
+        return renderer.copy_from_bbox(bbox, _backend_agg)
 
     def restore_region(self, region, bbox=None, xy=None):
         renderer = self.get_renderer()

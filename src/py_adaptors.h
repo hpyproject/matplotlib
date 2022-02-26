@@ -206,7 +206,12 @@ class PathGenerator
   public:
     typedef PathIterator path_iterator;
 
-    PathGenerator() : m_ctx(NULL), m_paths(HPy_NULL), m_npaths(0) {}
+    PathGenerator(HPyContext *ctx, HPy obj) : m_ctx(NULL), m_paths(HPy_NULL), m_npaths(0) 
+    {
+        if (!set(ctx, obj)) {
+            throw py::exception();
+        }
+    }
 
     ~PathGenerator()
     {

@@ -31,6 +31,7 @@
 #include "hpy.h"
 #else
 #include <Python.h>
+extern "C" int add_dict_int(PyObject *dict, const char *key, long val);
 #endif
 
 #undef CLAMP
@@ -55,6 +56,5 @@ enum {
 
 const size_t NUM_VERTICES[] = { 1, 1, 1, 2, 3, 1 };
 
-extern "C" int add_dict_int(PyObject *dict, const char *key, long val);
 
 #endif

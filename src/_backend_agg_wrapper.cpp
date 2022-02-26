@@ -2,100 +2,106 @@
 #include "numpy_cpp.h"
 #include "py_converters.h"
 #include "_backend_agg.h"
+#include "hpy.h"
 
 typedef struct
 {
-    PyObject_HEAD
     RendererAgg *x;
-    Py_ssize_t shape[3];
-    Py_ssize_t strides[3];
-    Py_ssize_t suboffsets[3];
+    HPy_ssize_t shape[3];
+    HPy_ssize_t strides[3];
+    HPy_ssize_t suboffsets[3];
 } PyRendererAgg;
 
+HPyType_HELPERS(PyRendererAgg)
+
+
 typedef struct
 {
-    PyObject_HEAD
     BufferRegion *x;
-    Py_ssize_t shape[3];
-    Py_ssize_t strides[3];
-    Py_ssize_t suboffsets[3];
+    HPy_ssize_t shape[3];
+    HPy_ssize_t strides[3];
+    HPy_ssize_t suboffsets[3];
 } PyBufferRegion;
 
+HPyType_HELPERS(PyBufferRegion)
 
 /**********************************************************************
  * BufferRegion
  * */
 
-static PyObject *PyBufferRegion_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+static HPy PyBufferRegion_new(HPyContext *ctx, HPy type, HPy* args, HPy_ssize_t nargs, HPy kwds)
 {
     PyBufferRegion *self;
-    self = (PyBufferRegion *)type->tp_alloc(type, 0);
+    HPy h_self = HPy_New(ctx, type, &self);
     self->x = NULL;
-    return (PyObject *)self;
+    return h_self;
 }
 
-static void PyBufferRegion_dealloc(PyBufferRegion *self)
+static void PyBufferRegion_dealloc(void *obj)
 {
+    PyBufferRegion* self = (PyBufferRegion*)obj;
     delete self->x;
-    Py_TYPE(self)->tp_free((PyObject *)self);
+    //Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-static PyObject *PyBufferRegion_to_string(PyBufferRegion *self, PyObject *args, PyObject *kwds)
+static HPy PyBufferRegion_to_string(HPyContext *ctx, HPy h_self)
 {
-    return PyBytes_FromStringAndSize((const char *)self->x->get_data(),
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
+    return HPyBytes_FromStringAndSize(ctx, (const char *)self->x->get_data(),
                                      self->x->get_height() * self->x->get_stride());
 }
 
 /* TODO: This doesn't seem to be used internally.  Remove? */
 
-static PyObject *PyBufferRegion_set_x(PyBufferRegion *self, PyObject *args, PyObject *kwds)
+static HPy PyBufferRegion_set_x(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
     int x;
-    if (!PyArg_ParseTuple(args, "i:set_x", &x)) {
-        return NULL;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, "i:set_x", &x)) {
+        return HPy_NULL;
     }
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
     self->x->get_rect().x1 = x;
 
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-static PyObject *PyBufferRegion_set_y(PyBufferRegion *self, PyObject *args, PyObject *kwds)
+static HPy PyBufferRegion_set_y(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
     int y;
-    if (!PyArg_ParseTuple(args, "i:set_y", &y)) {
-        return NULL;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, "i:set_y", &y)) {
+        return HPy_NULL;
     }
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
     self->x->get_rect().y1 = y;
 
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-static PyObject *PyBufferRegion_get_extents(PyBufferRegion *self, PyObject *args, PyObject *kwds)
+static HPy PyBufferRegion_get_extents(HPyContext *ctx, HPy h_self)
 {
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
     agg::rect_i rect = self->x->get_rect();
 
-    return Py_BuildValue("IIII", rect.x1, rect.y1, rect.x2, rect.y2);
+    return HPy_BuildValue(ctx, "IIII", rect.x1, rect.y1, rect.x2, rect.y2);
 }
 
-static PyObject *PyBufferRegion_to_string_argb(PyBufferRegion *self, PyObject *args, PyObject *kwds)
+static HPy PyBufferRegion_to_string_argb(HPyContext *ctx, HPy h_self)
 {
-    PyObject *bufobj;
-    uint8_t *buf;
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
+    HPy bufobj = HPyBytes_FromStringAndSize(ctx, NULL, self->x->get_height() * self->x->get_stride());
+    uint8_t *buf = (uint8_t *)HPyBytes_AS_STRING(ctx, bufobj);
 
-    bufobj = PyBytes_FromStringAndSize(NULL, self->x->get_height() * self->x->get_stride());
-    buf = (uint8_t *)PyBytes_AS_STRING(bufobj);
-
-    CALL_CPP_CLEANUP("to_string_argb", (self->x->to_string_argb(buf)), Py_DECREF(bufobj));
+    CALL_CPP_CLEANUP_HPY(ctx, "to_string_argb", (self->x->to_string_argb(buf)), HPy_Close(ctx, bufobj));
 
     return bufobj;
 }
 
-int PyBufferRegion_get_buffer(PyBufferRegion *self, Py_buffer *buf, int flags)
+static int PyBufferRegion_get_buffer(HPyContext *ctx, HPy h_self, HPy_buffer* buf, int flags)
 {
-    Py_INCREF(self);
-    buf->obj = (PyObject *)self;
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
+    buf->obj = HPy_Dup(ctx, h_self);
     buf->buf = self->x->get_data();
-    buf->len = (Py_ssize_t)self->x->get_width() * (Py_ssize_t)self->x->get_height() * 4;
+    buf->len = (HPy_ssize_t)self->x->get_width() * (HPy_ssize_t)self->x->get_height() * 4;
     buf->readonly = 0;
     buf->format = (char *)"B";
     buf->ndim = 3;
@@ -114,213 +120,251 @@ int PyBufferRegion_get_buffer(PyBufferRegion *self, Py_buffer *buf, int flags)
     return 1;
 }
 
-static PyTypeObject PyBufferRegionType;
+HPyDef_SLOT(PyBufferRegion_new_def, PyBufferRegion_new, HPy_tp_new)
+HPyDef_SLOT(PyBufferRegion_get_buffer_def, PyBufferRegion_get_buffer, HPy_bf_getbuffer)
+HPyDef_SLOT(PyBufferRegion_dealloc_def, PyBufferRegion_dealloc, HPy_tp_destroy)
 
-static PyTypeObject *PyBufferRegion_init_type(PyObject *m, PyTypeObject *type)
-{
-    static PyMethodDef methods[] = {
-        { "to_string", (PyCFunction)PyBufferRegion_to_string, METH_NOARGS, NULL },
-        { "to_string_argb", (PyCFunction)PyBufferRegion_to_string_argb, METH_NOARGS, NULL },
-        { "set_x", (PyCFunction)PyBufferRegion_set_x, METH_VARARGS, NULL },
-        { "set_y", (PyCFunction)PyBufferRegion_set_y, METH_VARARGS, NULL },
-        { "get_extents", (PyCFunction)PyBufferRegion_get_extents, METH_NOARGS, NULL },
-        { NULL }
-    };
+HPyDef_METH(PyBufferRegion_to_string_def, "to_string", PyBufferRegion_to_string, HPyFunc_NOARGS)
+HPyDef_METH(PyBufferRegion_to_string_argb_def, "to_string_argb", PyBufferRegion_to_string_argb, HPyFunc_NOARGS)
+HPyDef_METH(PyBufferRegion_set_x_def, "set_x", PyBufferRegion_set_x, HPyFunc_VARARGS)
+HPyDef_METH(PyBufferRegion_set_y_def, "set_y", PyBufferRegion_set_y, HPyFunc_VARARGS)
+HPyDef_METH(PyBufferRegion_get_extents_def, "get_extents", PyBufferRegion_get_extents, HPyFunc_NOARGS)
 
-    static PyBufferProcs buffer_procs;
-    memset(&buffer_procs, 0, sizeof(PyBufferProcs));
-    buffer_procs.bf_getbuffer = (getbufferproc)PyBufferRegion_get_buffer;
+HPyDef *PyBufferRegion_defines[] = {
+    // slots
+    &PyBufferRegion_new_def,
+    &PyBufferRegion_get_buffer_def,
+    &PyBufferRegion_dealloc_def,
 
-    memset(type, 0, sizeof(PyTypeObject));
-    type->tp_name = "matplotlib.backends._backend_agg.BufferRegion";
-    type->tp_basicsize = sizeof(PyBufferRegion);
-    type->tp_dealloc = (destructor)PyBufferRegion_dealloc;
-    type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-    type->tp_methods = methods;
-    type->tp_new = PyBufferRegion_new;
-    type->tp_as_buffer = &buffer_procs;
+    // methods
+    &PyBufferRegion_to_string_def,
+    &PyBufferRegion_to_string_argb_def,
+    &PyBufferRegion_set_x_def,
+    &PyBufferRegion_set_y_def,
+    &PyBufferRegion_get_extents_def,
+    NULL
+};
 
-    if (PyType_Ready(type) < 0) {
-        return NULL;
-    }
+HPyType_Spec PyBufferRegion_type_spec = {
+    .name = "matplotlib.backends._backend_agg.BufferRegion",
+    .basicsize = sizeof(PyBufferRegion),
+    .flags = HPy_TPFLAGS_DEFAULT | HPy_TPFLAGS_BASETYPE,
+    .defines = PyBufferRegion_defines,
+};
 
-    /* Don't need to add to module, since you can't create buffer
-       regions directly from Python */
-
-    return type;
-}
 
 /**********************************************************************
  * RendererAgg
  * */
 
-static PyObject *PyRendererAgg_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+static HPy PyRendererAgg_new(HPyContext *ctx, HPy type, HPy* args, HPy_ssize_t nargs, HPy kwds)
 {
     PyRendererAgg *self;
-    self = (PyRendererAgg *)type->tp_alloc(type, 0);
+    HPy h_self = HPy_New(ctx, type, &self);
     self->x = NULL;
-    return (PyObject *)self;
+    return h_self;
 }
 
-static int PyRendererAgg_init(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static int PyRendererAgg_init(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
 {
     unsigned int width;
     unsigned int height;
     double dpi;
     int debug = 0;
 
-    if (!PyArg_ParseTuple(args, "IId|i:RendererAgg", &width, &height, &dpi, &debug)) {
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, "IId|i:RendererAgg", &width, &height, &dpi, &debug)) {
         return -1;
     }
 
     if (dpi <= 0.0) {
-        PyErr_SetString(PyExc_ValueError, "dpi must be positive");
+        HPyErr_SetString(ctx, ctx->h_ValueError, "dpi must be positive");
         return -1;
     }
 
     if (width >= 1 << 16 || height >= 1 << 16) {
-        PyErr_Format(
-            PyExc_ValueError,
-            "Image size of %dx%d pixels is too large. "
-            "It must be less than 2^16 in each direction.",
-            width, height);
+        // PyErr_Format(
+        //     PyExc_ValueError,
+        //     "Image size of %dx%d pixels is too large. "
+        //     "It must be less than 2^16 in each direction.",
+        //     width, height);
+        HPyErr_SetString(ctx, ctx->h_ValueError,
+            "Image size is too large. "
+            "It must be less than 2^16 in each direction.");
         return -1;
     }
 
-    CALL_CPP_INIT("RendererAgg", self->x = new RendererAgg(width, height, dpi))
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    CALL_CPP_INIT_HPY(ctx, "RendererAgg", self->x = new RendererAgg(width, height, dpi))
 
     return 0;
 }
 
-static void PyRendererAgg_dealloc(PyRendererAgg *self)
+static void PyRendererAgg_dealloc(void *obj)
 {
+    PyRendererAgg* self = (PyRendererAgg*)obj;
     delete self->x;
-    Py_TYPE(self)->tp_free((PyObject *)self);
+    //Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-static PyObject *PyRendererAgg_draw_path(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static HPy PyRendererAgg_draw_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    HPy h_gc = HPy_NULL;
+    HPy h_path = HPy_NULL;
+    HPy h_trans = HPy_NULL;
     GCAgg gc;
     py::PathIterator path;
     agg::trans_affine trans;
-    PyObject *faceobj = NULL;
+    HPy faceobj = HPy_NULL;
     agg::rgba face;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&O&|O:draw_path",
-                          &convert_gcagg,
-                          &gc,
-                          &convert_path,
-                          &path,
-                          &convert_trans_affine,
-                          &trans,
+    if (!HPyArg_Parse(ctx, NULL, args, nargs,
+                          "OOO|O:draw_path",
+                          &h_gc,
+                          &h_path,
+                          &h_trans,
                           &faceobj)) {
-        return NULL;
+        return HPy_NULL;
     }
 
-    if (!convert_face(faceobj, gc, &face)) {
-        return NULL;
+    if (!convert_gcagg_hpy(ctx, h_gc, &gc)
+                || !convert_path_hpy(ctx, h_path, &path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)
+                || !convert_face_hpy(ctx, faceobj, gc, &face)) {
+            if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "draw_path"); // TODO
+        return HPy_NULL;
     }
 
-    CALL_CPP("draw_path", (self->x->draw_path(gc, path, trans, face)));
+    CALL_CPP_HPY(ctx, "draw_path", (self->x->draw_path(gc, path, trans, face)));
 
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-static PyObject *PyRendererAgg_draw_text_image(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static HPy PyRendererAgg_draw_text_image(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_image = HPy_NULL;
+    HPy h_gc = HPy_NULL;
     numpy::array_view<agg::int8u, 2> image;
     double x;
     double y;
     double angle;
     GCAgg gc;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&dddO&:draw_text_image",
-                          &image.converter_contiguous,
-                          &image,
+    if (!HPyArg_Parse(ctx, NULL, args, nargs,
+                          "OdddO:draw_text_image",
+                          &h_image,
                           &x,
                           &y,
                           &angle,
-                          &convert_gcagg,
-                          &gc)) {
-        return NULL;
+                          &h_gc)) {
+        return HPy_NULL;
     }
 
-    CALL_CPP("draw_text_image", (self->x->draw_text_image(gc, image, x, y, angle)));
+    if (!image.converter_contiguous(HPy_AsPyObject(ctx, h_image), &image)
+            || !convert_gcagg_hpy(ctx, h_gc, &gc)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "draw_text_image"); // TODO
+        return HPy_NULL;
+    }
 
-    Py_RETURN_NONE;
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    CALL_CPP_HPY(ctx, "draw_text_image", (self->x->draw_text_image(gc, image, x, y, angle)));
+
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-PyObject *PyRendererAgg_draw_markers(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static HPy PyRendererAgg_draw_markers(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_gc = HPy_NULL;
+    HPy h_marker_path = HPy_NULL;
+    HPy h_marker_path_trans = HPy_NULL;
+    HPy h_path = HPy_NULL;
+    HPy h_trans = HPy_NULL;
     GCAgg gc;
     py::PathIterator marker_path;
     agg::trans_affine marker_path_trans;
     py::PathIterator path;
     agg::trans_affine trans;
-    PyObject *faceobj = NULL;
+    HPy faceobj = HPy_NULL;
     agg::rgba face;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&O&O&O&|O:draw_markers",
-                          &convert_gcagg,
-                          &gc,
-                          &convert_path,
-                          &marker_path,
-                          &convert_trans_affine,
-                          &marker_path_trans,
-                          &convert_path,
-                          &path,
-                          &convert_trans_affine,
-                          &trans,
+    if (!HPyArg_Parse(ctx, NULL, args, nargs,
+                          "OOOOO|O:draw_markers",
+                          &h_gc,
+                          &h_marker_path,
+                          &h_marker_path_trans,
+                          &h_path,
+                          &h_trans,
                           &faceobj)) {
-        return NULL;
+        return HPy_NULL;
     }
 
-    if (!convert_face(faceobj, gc, &face)) {
-        return NULL;
+    if (!convert_gcagg_hpy(ctx, h_gc, &gc)
+                || !convert_path_hpy(ctx, h_marker_path, &marker_path)
+                || !convert_trans_affine_hpy(ctx, h_marker_path_trans, &marker_path_trans)
+                || !convert_path_hpy(ctx, h_path, &path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)
+                || !convert_face_hpy(ctx, faceobj, gc, &face)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "draw_markers"); // TODO
+        return HPy_NULL;
     }
 
-    CALL_CPP("draw_markers",
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    CALL_CPP_HPY(ctx, "draw_markers",
              (self->x->draw_markers(gc, marker_path, marker_path_trans, path, trans, face)));
 
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-static PyObject *PyRendererAgg_draw_image(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static HPy PyRendererAgg_draw_image(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_gc = HPy_NULL;
+    HPy h_image = HPy_NULL;
     GCAgg gc;
     double x;
     double y;
     numpy::array_view<agg::int8u, 3> image;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&ddO&:draw_image",
-                          &convert_gcagg,
-                          &gc,
+    if (!HPyArg_Parse(ctx, NULL, args, nargs,
+                          "OddO:draw_image",
+                          &h_gc,
                           &x,
                           &y,
-                          &image.converter_contiguous,
-                          &image)) {
-        return NULL;
+                          &h_image)) {
+        return HPy_NULL;
+    }
+
+    if (!convert_gcagg_hpy(ctx, h_gc, &gc)
+                || !image.converter_contiguous(HPy_AsPyObject(ctx, h_image), &image)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "draw_image"); // TODO
+        return HPy_NULL;
     }
 
     x = mpl_round(x);
     y = mpl_round(y);
 
     gc.alpha = 1.0;
-    CALL_CPP("draw_image", (self->x->draw_image(gc, x, y, image)));
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    CALL_CPP_HPY(ctx, "draw_image", (self->x->draw_image(gc, x, y, image)));
 
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-static PyObject *
-PyRendererAgg_draw_path_collection(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static HPy 
+PyRendererAgg_draw_path_collection(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_gc = HPy_NULL;
+    HPy h_master_transform = HPy_NULL;
+    HPy h_paths = HPy_NULL;
+    HPy h_transforms = HPy_NULL;
+    HPy h_offsets = HPy_NULL;
+    HPy h_offset_trans = HPy_NULL;
+    HPy h_facecolors = HPy_NULL;
+    HPy h_edgecolors = HPy_NULL;
+    HPy h_linewidths = HPy_NULL;
+    HPy h_dashes = HPy_NULL;
+    HPy h_antialiaseds = HPy_NULL;
     GCAgg gc;
     agg::trans_affine master_transform;
-    PyObject *pathobj;
     numpy::array_view<const double, 3> transforms;
     numpy::array_view<const double, 2> offsets;
     agg::trans_affine offset_trans;
@@ -329,43 +373,49 @@ PyRendererAgg_draw_path_collection(PyRendererAgg *self, PyObject *args, PyObject
     numpy::array_view<const double, 1> linewidths;
     DashesVector dashes;
     numpy::array_view<const uint8_t, 1> antialiaseds;
-    PyObject *ignored;
+    HPy ignored;
     e_offset_position offset_position;
+    HPy h_offset_position = HPy_NULL;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&OO&O&O&O&O&O&O&O&OO&:draw_path_collection",
-                          &convert_gcagg,
-                          &gc,
-                          &convert_trans_affine,
-                          &master_transform,
-                          &pathobj,
-                          &convert_transforms,
-                          &transforms,
-                          &convert_points,
-                          &offsets,
-                          &convert_trans_affine,
-                          &offset_trans,
-                          &convert_colors,
-                          &facecolors,
-                          &convert_colors,
-                          &edgecolors,
-                          &linewidths.converter,
-                          &linewidths,
-                          &convert_dashes_vector,
-                          &dashes,
-                          &antialiaseds.converter,
-                          &antialiaseds,
+    if (!HPyArg_Parse(ctx, NULL, args, nargs,
+                          "OOOOOOOOOOOOO:draw_path_collection",
+                          &h_gc,
+                          &h_master_transform,
+                          &h_paths,
+                          &h_transforms,
+                          &h_offsets,
+                          &h_offset_trans,
+                          &h_facecolors,
+                          &h_edgecolors,
+                          &h_linewidths,
+                          &h_dashes,
+                          &h_antialiaseds,
                           &ignored,
-                          &convert_offset_position,
-                          &offset_position)) {
-        return NULL;
+                          &h_offset_position)) {
+        return HPy_NULL;
     }
 
+    if (!convert_gcagg_hpy(ctx, h_gc, &gc)
+                || !convert_trans_affine_hpy(ctx, h_master_transform, &master_transform)
+                || !convert_transforms_hpy(ctx, h_transforms, &transforms)
+                || !convert_points_hpy(ctx, h_offsets, &offsets)
+                || !convert_trans_affine_hpy(ctx, h_offset_trans, &offset_trans)
+                || !convert_colors_hpy(ctx, h_facecolors, &facecolors)
+                || !convert_colors_hpy(ctx, h_edgecolors, &edgecolors)
+                || !linewidths.converter(HPy_AsPyObject(ctx, h_linewidths), &linewidths)
+                || !convert_dashes_vector_hpy(ctx, h_dashes, &dashes)
+                || !antialiaseds.converter(HPy_AsPyObject(ctx, h_antialiaseds), &antialiaseds)
+                || !convert_offset_position_hpy(ctx, h_offset_position, &offset_position)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "draw_path_collection"); // TODO
+        return HPy_NULL;
+    }
+
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     try
     {
-        py::PathGenerator path(pathobj);
+        py::PathGenerator path(ctx, h_paths);
 
-        CALL_CPP("draw_path_collection",
+        CALL_CPP_HPY(ctx, "draw_path_collection",
                  (self->x->draw_path_collection(gc,
                                                 master_transform,
                                                 path,
@@ -381,14 +431,22 @@ PyRendererAgg_draw_path_collection(PyRendererAgg *self, PyObject *args, PyObject
     }
     catch (const py::exception &)
     {
-        return NULL;
+        return HPy_NULL;
     }
 
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-static PyObject *PyRendererAgg_draw_quad_mesh(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static HPy PyRendererAgg_draw_quad_mesh(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_gc = HPy_NULL;
+    HPy h_master_transform = HPy_NULL;
+    HPy h_coordinates = HPy_NULL;
+    HPy h_offsets = HPy_NULL;
+    HPy h_offset_trans = HPy_NULL;
+    HPy h_facecolors = HPy_NULL;
+    HPy h_antialiased = HPy_NULL;
+    HPy h_edgecolors = HPy_NULL;
     GCAgg gc;
     agg::trans_affine master_transform;
     unsigned int mesh_width;
@@ -400,30 +458,35 @@ static PyObject *PyRendererAgg_draw_quad_mesh(PyRendererAgg *self, PyObject *arg
     bool antialiased;
     numpy::array_view<const double, 2> edgecolors;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&IIO&O&O&O&O&O&:draw_quad_mesh",
-                          &convert_gcagg,
-                          &gc,
-                          &convert_trans_affine,
-                          &master_transform,
+    if (!HPyArg_Parse(ctx, NULL, args, nargs,
+                          "OOIIOOOOOO:draw_quad_mesh",
+                          &h_gc,
+                          &h_master_transform,
                           &mesh_width,
                           &mesh_height,
-                          &coordinates.converter,
-                          &coordinates,
-                          &convert_points,
-                          &offsets,
-                          &convert_trans_affine,
-                          &offset_trans,
-                          &convert_colors,
-                          &facecolors,
-                          &convert_bool,
-                          &antialiased,
-                          &convert_colors,
-                          &edgecolors)) {
-        return NULL;
+                          &h_coordinates,
+                          &h_offsets,
+                          &h_offset_trans,
+                          &h_facecolors,
+                          &h_antialiased,
+                          &h_edgecolors)) {
+        return HPy_NULL;
     }
 
-    CALL_CPP("draw_quad_mesh",
+    if (!convert_gcagg_hpy(ctx, h_gc, &gc)
+                || !convert_trans_affine_hpy(ctx, h_master_transform, &master_transform)
+                || !coordinates.converter(HPy_AsPyObject(ctx, h_coordinates), &coordinates)
+                || !convert_points_hpy(ctx, h_offsets, &offsets)
+                || !convert_trans_affine_hpy(ctx, h_offset_trans, &offset_trans)
+                || !convert_colors_hpy(ctx, h_facecolors, &facecolors)
+                || !convert_bool_hpy(ctx, h_antialiased, &antialiased)
+                || !convert_colors_hpy(ctx, h_edgecolors, &edgecolors)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "draw_quad_mesh"); // TODO
+        return HPy_NULL;
+    }
+
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    CALL_CPP_HPY(ctx, "draw_quad_mesh",
              (self->x->draw_quad_mesh(gc,
                                       master_transform,
                                       mesh_width,
@@ -435,103 +498,131 @@ static PyObject *PyRendererAgg_draw_quad_mesh(PyRendererAgg *self, PyObject *arg
                                       antialiased,
                                       edgecolors)));
 
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-static PyObject *
-PyRendererAgg_draw_gouraud_triangle(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static HPy 
+PyRendererAgg_draw_gouraud_triangle(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_gc = HPy_NULL;
+    HPy h_points = HPy_NULL;
+    HPy h_colors = HPy_NULL;
+    HPy h_trans = HPy_NULL;
     GCAgg gc;
     numpy::array_view<const double, 2> points;
     numpy::array_view<const double, 2> colors;
     agg::trans_affine trans;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&O&O&|O:draw_gouraud_triangle",
-                          &convert_gcagg,
-                          &gc,
-                          &points.converter,
-                          &points,
-                          &colors.converter,
-                          &colors,
-                          &convert_trans_affine,
-                          &trans)) {
-        return NULL;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs,
+                          "OOOO|O:draw_gouraud_triangle",
+                          &h_gc,
+                          &h_points,
+                          &h_colors,
+                          &h_trans)) {
+        return HPy_NULL;
+    }
+
+    if (!convert_gcagg_hpy(ctx, h_gc, &gc)
+                || !points.converter(HPy_AsPyObject(ctx, h_points), &points)
+                || !colors.converter(HPy_AsPyObject(ctx, h_colors), &colors)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "draw_gouraud_triangle"); // TODO
+        return HPy_NULL;
     }
 
     if (points.dim(0) != 3 || points.dim(1) != 2) {
-        PyErr_Format(PyExc_ValueError,
-                     "points must be a 3x2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-                     points.dim(0), points.dim(1));
-        return NULL;
+        // PyErr_Format(PyExc_ValueError,
+        //              "points must be a 3x2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+        //              points.dim(0), points.dim(1)); TODO: HPyErr_Format
+        HPyErr_SetString(ctx, ctx->h_ValueError,
+                     "points must be a 3x2 array");
+        return HPy_NULL;
     }
 
     if (colors.dim(0) != 3 || colors.dim(1) != 4) {
-        PyErr_Format(PyExc_ValueError,
-                     "colors must be a 3x4 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-                     colors.dim(0), colors.dim(1));
-        return NULL;
+        // PyErr_Format(PyExc_ValueError,
+        //              "colors must be a 3x4 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+        //              colors.dim(0), colors.dim(1)); TODO: HPyErr_Format
+        HPyErr_SetString(ctx, ctx->h_ValueError,
+                     "colors must be a 3x4 array");
+        return HPy_NULL;
     }
 
 
-    CALL_CPP("draw_gouraud_triangle", (self->x->draw_gouraud_triangle(gc, points, colors, trans)));
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    CALL_CPP_HPY(ctx, "draw_gouraud_triangle", (self->x->draw_gouraud_triangle(gc, points, colors, trans)));
 
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-static PyObject *
-PyRendererAgg_draw_gouraud_triangles(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static HPy 
+PyRendererAgg_draw_gouraud_triangles(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_gc = HPy_NULL;
+    HPy h_points = HPy_NULL;
+    HPy h_colors = HPy_NULL;
+    HPy h_trans = HPy_NULL;
     GCAgg gc;
     numpy::array_view<const double, 3> points;
     numpy::array_view<const double, 3> colors;
     agg::trans_affine trans;
 
-    if (!PyArg_ParseTuple(args,
-                          "O&O&O&O&|O:draw_gouraud_triangles",
-                          &convert_gcagg,
-                          &gc,
-                          &points.converter,
-                          &points,
-                          &colors.converter,
-                          &colors,
-                          &convert_trans_affine,
-                          &trans)) {
-        return NULL;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs,
+                          "OOOO|O:draw_gouraud_triangles",
+                          &h_gc,
+                          &h_points,
+                          &h_colors,
+                          &h_trans)) {
+        return HPy_NULL;
+    }
+
+    if (!convert_gcagg_hpy(ctx, h_gc, &gc)
+                || !points.converter(HPy_AsPyObject(ctx, h_points), &points)
+                || !colors.converter(HPy_AsPyObject(ctx, h_colors), &colors)
+                || !convert_trans_affine_hpy(ctx, h_trans, &trans)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "draw_gouraud_triangles"); // TODO
+        return HPy_NULL;
     }
 
     if (points.size() != 0 && (points.dim(1) != 3 || points.dim(2) != 2)) {
-        PyErr_Format(PyExc_ValueError,
-                     "points must be a Nx3x2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-                     points.dim(0), points.dim(1), points.dim(2));
-        return NULL;
+        // PyErr_Format(PyExc_ValueError,
+        //              "points must be a Nx3x2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+        //              points.dim(0), points.dim(1), points.dim(2));
+        HPyErr_SetString(ctx, ctx->h_ValueError,
+                     "points must be a Nx3x2 array");
+        return HPy_NULL;
     }
 
     if (colors.size() != 0 && (colors.dim(1) != 3 || colors.dim(2) != 4)) {
-        PyErr_Format(PyExc_ValueError,
-                     "colors must be a Nx3x4 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-                     colors.dim(0), colors.dim(1), colors.dim(2));
-        return NULL;
+        // PyErr_Format(PyExc_ValueError,
+        //              "colors must be a Nx3x4 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+        //              colors.dim(0), colors.dim(1), colors.dim(2));
+        HPyErr_SetString(ctx, ctx->h_ValueError,
+                     "colors must be a Nx3x4 array");
+        return HPy_NULL;
     }
 
     if (points.size() != colors.size()) {
-        PyErr_Format(PyExc_ValueError,
-                     "points and colors arrays must be the same length, got %" NPY_INTP_FMT " and %" NPY_INTP_FMT,
-                     points.dim(0), colors.dim(0));
-        return NULL;
+        // PyErr_Format(PyExc_ValueError,
+        //              "points and colors arrays must be the same length, got %" NPY_INTP_FMT " and %" NPY_INTP_FMT,
+        //              points.dim(0), colors.dim(0));
+        HPyErr_SetString(ctx, ctx->h_ValueError,
+                     "points and colors arrays must be the same length");
+        return HPy_NULL;
     }
 
-    CALL_CPP("draw_gouraud_triangles", self->x->draw_gouraud_triangles(gc, points, colors, trans));
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    CALL_CPP_HPY(ctx, "draw_gouraud_triangles", self->x->draw_gouraud_triangles(gc, points, colors, trans));
 
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-int PyRendererAgg_get_buffer(PyRendererAgg *self, Py_buffer *buf, int flags)
+static int PyRendererAgg_get_buffer(HPyContext *ctx, HPy h_self, HPy_buffer* buf, int flags)
 {
-    Py_INCREF(self);
-    buf->obj = (PyObject *)self;
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    buf->obj = HPy_Dup(ctx, h_self);
     buf->buf = self->x->pixBuffer;
-    buf->len = (Py_ssize_t)self->x->get_width() * (Py_ssize_t)self->x->get_height() * 4;
+    buf->len = (HPy_ssize_t)self->x->get_width() * (HPy_ssize_t)self->x->get_height() * 4;
     buf->readonly = 0;
     buf->format = (char *)"B";
     buf->ndim = 3;
@@ -550,139 +641,177 @@ int PyRendererAgg_get_buffer(PyRendererAgg *self, Py_buffer *buf, int flags)
     return 1;
 }
 
-static PyObject *PyRendererAgg_clear(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static HPy PyRendererAgg_clear(HPyContext *ctx, HPy h_self)
 {
-    CALL_CPP("clear", self->x->clear());
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    CALL_CPP_HPY(ctx, "clear", self->x->clear());
 
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-static PyObject *PyRendererAgg_copy_from_bbox(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static HPy PyRendererAgg_copy_from_bbox(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     agg::rect_d bbox;
     BufferRegion *reg;
-    PyObject *regobj;
+    HPy h_regobj;
+    HPy m;
+    HPy h_bbox = HPy_NULL;
 
-    if (!PyArg_ParseTuple(args, "O&:copy_from_bbox", &convert_rect, &bbox)) {
-        return 0;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, "OO:copy_from_bbox", &h_bbox, &m /* _backend_agg module */)) {
+                return HPy_NULL;
     }
 
-    CALL_CPP("copy_from_bbox", (reg = self->x->copy_from_bbox(bbox)));
+    if (!convert_rect_hpy(ctx, h_bbox, &bbox)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "copy_from_bbox"); // TODO
+        return HPy_NULL;
+    }
 
-    regobj = PyBufferRegion_new(&PyBufferRegionType, NULL, NULL);
-    ((PyBufferRegion *)regobj)->x = reg;
 
-    return regobj;
+    CALL_CPP_HPY(ctx, "copy_from_bbox", (reg = self->x->copy_from_bbox(bbox)));
+
+    HPy h_PyBufferRegionType = HPy_GetAttr_s(ctx, m, "BufferRegion");
+    h_regobj = PyBufferRegion_new(ctx, h_PyBufferRegionType, NULL, 0, HPy_NULL);
+    HPy_Close(ctx, h_PyBufferRegionType);
+    PyBufferRegion* regobj = PyBufferRegion_AsStruct(ctx, h_regobj);
+    regobj->x = reg;
+
+    return h_regobj;
 }
 
-static PyObject *PyRendererAgg_restore_region(PyRendererAgg *self, PyObject *args, PyObject *kwds)
+static HPy PyRendererAgg_restore_region(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
-    PyBufferRegion *regobj;
+    HPy h_regobj;
+    HPy m;
     int xx1 = 0, yy1 = 0, xx2 = 0, yy2 = 0, x = 0, y = 0;
 
-    if (!PyArg_ParseTuple(args,
-                          "O!|iiiiii:restore_region",
-                          &PyBufferRegionType,
-                          &regobj,
+    if (!HPyArg_Parse(ctx, NULL, args, nargs,
+                          "OO|iiiiii:restore_region",
+                          &h_regobj,
+                          &m, /* _backend_agg module */
                           &xx1,
                           &yy1,
                           &xx2,
                           &yy2,
                           &x,
                           &y)) {
-        return 0;
+        return HPy_NULL;
     }
 
-    if (PySequence_Size(args) == 1) {
-        CALL_CPP("restore_region", self->x->restore_region(*(regobj->x)));
+    HPy h_PyBufferRegionType = HPy_GetAttr_s(ctx, m, "BufferRegion");
+    if (!HPy_TypeCheck(ctx, h_regobj, h_PyBufferRegionType)) {
+        HPy_Close(ctx, h_PyBufferRegionType);
+        HPyErr_SetString(ctx, ctx->h_TypeError, "arg must be BufferRegion"); // TODO
+        return HPy_NULL;
+    }
+    HPy_Close(ctx, h_PyBufferRegionType);
+
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    PyBufferRegion* regobj = PyBufferRegion_AsStruct(ctx, h_regobj);
+    if (nargs == 1) {
+        CALL_CPP_HPY(ctx, "restore_region", self->x->restore_region(*(regobj->x)));
     } else {
-        CALL_CPP("restore_region", self->x->restore_region(*(regobj->x), xx1, yy1, xx2, yy2, x, y));
+        CALL_CPP_HPY(ctx, "restore_region", self->x->restore_region(*(regobj->x), xx1, yy1, xx2, yy2, x, y));
     }
 
-    Py_RETURN_NONE;
+    return HPy_Dup(ctx, ctx->h_None);
 }
 
-PyTypeObject PyRendererAggType;
+HPyDef_SLOT(PyRendererAgg_new_def, PyRendererAgg_new, HPy_tp_new)
+HPyDef_SLOT(PyRendererAgg_init_def, PyRendererAgg_init, HPy_tp_init)
+HPyDef_SLOT(PyRendererAgg_get_buffer_def, PyRendererAgg_get_buffer, HPy_bf_getbuffer)
+HPyDef_SLOT(PyRendererAgg_dealloc_def, PyRendererAgg_dealloc, HPy_tp_destroy)
 
-static PyTypeObject *PyRendererAgg_init_type(PyObject *m, PyTypeObject *type)
-{
-    static PyMethodDef methods[] = {
-        {"draw_path", (PyCFunction)PyRendererAgg_draw_path, METH_VARARGS, NULL},
-        {"draw_markers", (PyCFunction)PyRendererAgg_draw_markers, METH_VARARGS, NULL},
-        {"draw_text_image", (PyCFunction)PyRendererAgg_draw_text_image, METH_VARARGS, NULL},
-        {"draw_image", (PyCFunction)PyRendererAgg_draw_image, METH_VARARGS, NULL},
-        {"draw_path_collection", (PyCFunction)PyRendererAgg_draw_path_collection, METH_VARARGS, NULL},
-        {"draw_quad_mesh", (PyCFunction)PyRendererAgg_draw_quad_mesh, METH_VARARGS, NULL},
-        {"draw_gouraud_triangle", (PyCFunction)PyRendererAgg_draw_gouraud_triangle, METH_VARARGS, NULL},
-        {"draw_gouraud_triangles", (PyCFunction)PyRendererAgg_draw_gouraud_triangles, METH_VARARGS, NULL},
+HPyDef_METH(PyRendererAgg_draw_path_def, "draw_path", PyRendererAgg_draw_path, HPyFunc_VARARGS)
+HPyDef_METH(PyRendererAgg_draw_markers_def, "draw_markers", PyRendererAgg_draw_markers, HPyFunc_VARARGS)
+HPyDef_METH(PyRendererAgg_draw_text_image_def, "draw_text_image", PyRendererAgg_draw_text_image, HPyFunc_VARARGS)
+HPyDef_METH(PyRendererAgg_draw_image_def, "draw_image", PyRendererAgg_draw_image, HPyFunc_VARARGS)
+HPyDef_METH(PyRendererAgg_draw_path_collection_def, "draw_path_collection", PyRendererAgg_draw_path_collection, HPyFunc_VARARGS)
+HPyDef_METH(PyRendererAgg_draw_quad_mesh_def, "draw_quad_mesh", PyRendererAgg_draw_quad_mesh, HPyFunc_VARARGS)
+HPyDef_METH(PyRendererAgg_draw_gouraud_triangle_def, "draw_gouraud_triangle", PyRendererAgg_draw_gouraud_triangle, HPyFunc_VARARGS)
+HPyDef_METH(PyRendererAgg_draw_gouraud_triangles_def, "draw_gouraud_triangles", PyRendererAgg_draw_gouraud_triangles, HPyFunc_VARARGS)
+HPyDef_METH(PyRendererAgg_clear_def, "clear", PyRendererAgg_clear, HPyFunc_NOARGS)
+HPyDef_METH(PyRendererAgg_copy_from_bbox_def, "copy_from_bbox", PyRendererAgg_copy_from_bbox, HPyFunc_VARARGS)
+HPyDef_METH(PyRendererAgg_restore_region_def, "restore_region", PyRendererAgg_restore_region, HPyFunc_VARARGS)
 
-        {"clear", (PyCFunction)PyRendererAgg_clear, METH_NOARGS, NULL},
 
-        {"copy_from_bbox", (PyCFunction)PyRendererAgg_copy_from_bbox, METH_VARARGS, NULL},
-        {"restore_region", (PyCFunction)PyRendererAgg_restore_region, METH_VARARGS, NULL},
-        {NULL}
-    };
-
-    static PyBufferProcs buffer_procs;
-    memset(&buffer_procs, 0, sizeof(PyBufferProcs));
-    buffer_procs.bf_getbuffer = (getbufferproc)PyRendererAgg_get_buffer;
-
-    memset(type, 0, sizeof(PyTypeObject));
-    type->tp_name = "matplotlib.backends._backend_agg.RendererAgg";
-    type->tp_basicsize = sizeof(PyRendererAgg);
-    type->tp_dealloc = (destructor)PyRendererAgg_dealloc;
-    type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-    type->tp_methods = methods;
-    type->tp_init = (initproc)PyRendererAgg_init;
-    type->tp_new = PyRendererAgg_new;
-    type->tp_as_buffer = &buffer_procs;
-
-    if (PyType_Ready(type) < 0) {
-        return NULL;
-    }
-
-    if (PyModule_AddObject(m, "RendererAgg", (PyObject *)type)) {
-        return NULL;
-    }
-
-    return type;
-}
-
-static struct PyModuleDef moduledef = {
-    PyModuleDef_HEAD_INIT,
-    "_backend_agg",
-    NULL,
-    0,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
+HPyDef *PyRendererAgg_defines[] = {
+    // slots
+    &PyRendererAgg_new_def,
+    &PyRendererAgg_init_def,
+    &PyRendererAgg_get_buffer_def,
+    &PyRendererAgg_dealloc_def,
+    
+    // methods
+    &PyRendererAgg_draw_path_def,
+    &PyRendererAgg_draw_markers_def,
+    &PyRendererAgg_draw_text_image_def,
+    &PyRendererAgg_draw_image_def,
+    &PyRendererAgg_draw_path_collection_def,
+    &PyRendererAgg_draw_quad_mesh_def,
+    &PyRendererAgg_draw_gouraud_triangle_def,
+    &PyRendererAgg_draw_gouraud_triangles_def,
+    &PyRendererAgg_clear_def,
+    &PyRendererAgg_copy_from_bbox_def,
+    &PyRendererAgg_restore_region_def,
     NULL
 };
 
+HPyType_Spec PyRendererAgg_type_spec = {
+    .name = "matplotlib.backends._backend_agg.RendererAgg",
+    .basicsize = sizeof(PyRendererAgg),
+    .flags = HPy_TPFLAGS_DEFAULT | HPy_TPFLAGS_BASETYPE,
+    .defines = PyRendererAgg_defines,
+};
+
+static HPyModuleDef moduledef = {
+    .name = "_backend_agg",
+    .doc = NULL,
+    .size = 0,
+};
+
+// Logic is from NumPy's import_array()
+static int npy_import_array_hpy(HPyContext *ctx) {
+    if (_import_array() < 0) {
+        // HPyErr_Print(ctx); TODO
+        HPyErr_SetString(ctx, ctx->h_ImportError, "numpy.core.multiarray failed to import"); 
+        return 0; 
+    }
+    return 1;
+}
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #pragma GCC visibility push(default)
 
-PyMODINIT_FUNC PyInit__backend_agg(void)
+HPy_MODINIT(_backend_agg)
+static HPy init__backend_agg_impl(HPyContext *ctx)
 {
-    PyObject *m;
-
-    m = PyModule_Create(&moduledef);
-
-    if (m == NULL) {
-        return NULL;
+    if (!npy_import_array_hpy(ctx)) {
+        return HPy_NULL;
+    }
+    HPy m = HPyModule_Create(ctx, &moduledef);
+    if (HPy_IsNull(m)) {
+        return HPy_NULL;
     }
 
-    import_array();
-
-    if (!PyRendererAgg_init_type(m, &PyRendererAggType)) {
-        return NULL;
+    if (!HPyHelpers_AddType(ctx, m, "RendererAgg", &PyRendererAgg_type_spec, NULL)) {
+        HPy_Close(ctx, m);
+        return HPy_NULL;
     }
 
-    if (!PyBufferRegion_init_type(m, &PyBufferRegionType)) {
-        return NULL;
+    if (!HPyHelpers_AddType(ctx, m, "BufferRegion", &PyBufferRegion_type_spec, NULL)) {
+        HPy_Close(ctx, m);
+        return HPy_NULL;
     }
 
     return m;
 }
 
 #pragma GCC visibility pop
+
+#ifdef __cplusplus
+}
+#endif

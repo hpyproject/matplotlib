@@ -2,6 +2,7 @@
 
 #include "mplutils.h"
 
+#ifndef HPY
 int add_dict_int(PyObject *dict, const char *key, long val)
 {
     PyObject *valobj;
@@ -19,3 +20,4 @@ int add_dict_int(PyObject *dict, const char *key, long val)
 
     return 0;
 }
+#endif
