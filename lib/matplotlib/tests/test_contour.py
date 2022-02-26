@@ -246,7 +246,7 @@ def test_contourf_symmetric_locator():
 
 @pytest.mark.parametrize("args, cls, message", [
     ((), TypeError,
-     'function takes exactly 6 arguments (0 given)'),
+     'function required positional argument missing'),
     ((1, 2, 3, 4, 5, 6), ValueError,
      'Expected 2-dimensional array, got 0'),
     (([[0]], [[0]], [[]], None, True, 0), ValueError,
