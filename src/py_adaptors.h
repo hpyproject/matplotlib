@@ -8,16 +8,26 @@
  * structures to C++ and Agg-friendly interfaces.
  */
 
-#include <Python.h>
-
 #include "numpy/arrayobject.h"
 
 #include "py_exceptions.h"
+
+#ifdef HPY
+#include "hpy.h"
+
+extern "C" {
+int convert_path_hpy(HPyContext *ctx, HPy obj, void *pathp);
+}
+
+#else
+
+#include <Python.h>
 
 extern "C" {
 int convert_path(PyObject *obj, void *pathp);
 }
 
+#endif
 namespace py
 {
 
@@ -186,6 +196,70 @@ class PathIterator
     }
 };
 
+#ifdef HPY
+class PathGenerator
+{
+    HPyContext *m_ctx;
+    HPy m_paths;
+    HPy_ssize_t m_npaths;
+
+  public:
+    typedef PathIterator path_iterator;
+
+    PathGenerator() : m_ctx(NULL), m_paths(HPy_NULL), m_npaths(0) {}
+
+    ~PathGenerator()
+    {
+        if (m_ctx) {
+            HPy_Close(m_ctx, m_paths);
+            m_ctx = NULL;
+        }
+    }
+
+    int set(HPyContext *ctx, HPy obj)
+    {
+        // if (!HPySequence_Check(ctx, obj)) { TODO: HPySequence_Check
+        if (!HPyList_Check(ctx, obj) && !HPyTuple_Check(ctx, obj)) {
+            return 0;
+        }
+
+        m_paths = HPy_Dup(ctx, obj);
+        m_ctx = ctx; 
+
+        m_npaths = HPy_Length(ctx, m_paths);
+
+        return 1;
+    }
+
+    HPy_ssize_t num_paths() const
+    {
+        return m_npaths;
+    }
+
+    HPy_ssize_t size() const
+    {
+        return m_npaths;
+    }
+
+    path_iterator operator()(size_t i)
+    {
+        path_iterator path;
+
+        HPy item = HPy_GetItem_i(m_ctx, m_paths, i % m_npaths);
+        if (HPy_IsNull(item)) {
+            throw py::exception();
+        }
+        if (!convert_path_hpy(m_ctx, item, &path)) {
+            HPy_Close(m_ctx, item);
+            throw py::exception();
+        }
+        HPy_Close(m_ctx, item);
+        return path;
+    }
+};
+
+#else
+
 class PathGenerator
 {
     PyObject *m_paths;
@@ -247,6 +321,7 @@ class PathGenerator
         return path;
     }
 };
+#endif
 }
 
 #endif

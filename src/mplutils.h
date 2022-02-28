@@ -27,7 +27,11 @@
 #endif
 #endif
 
+#ifdef HPY
+#include "hpy.h"
+#else
 #include <Python.h>
+#endif
 
 #undef CLAMP
 #define CLAMP(x, low, high) (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
