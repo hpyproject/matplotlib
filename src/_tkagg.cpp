@@ -10,7 +10,8 @@
 // you can get it at https://python-pillow.org/
 
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>
+#include "hpy.h"
+#include "hpy_helpers.h"
 
 #ifdef _WIN32
 #define WIN32_DLL
@@ -38,11 +39,11 @@
 // Include our own excerpts from the Tcl / Tk headers
 #include "_tkmini.h"
 
-static int convert_voidptr(PyObject *obj, void *p)
+static int convert_voidptr(HPyContext *ctx, HPy obj, void *p)
 {
     void **val = (void **)p;
-    *val = PyLong_AsVoidPtr(obj);
-    return *val != NULL ? 1 : !PyErr_Occurred();
+    *val = HPyLong_AsVoidPtr(ctx, obj);
+    return *val != NULL ? 1 : !HPyErr_Occurred(ctx);
 }
 
 // Global vars for Tk functions.  We load these symbols from the tkinter
@@ -50,8 +51,9 @@ static int convert_voidptr(PyObject *obj, void *p)
 static Tk_FindPhoto_t TK_FIND_PHOTO;
 static Tk_PhotoPutBlock_NoComposite_t TK_PHOTO_PUT_BLOCK_NO_COMPOSITE;
 
-static PyObject *mpl_tk_blit(PyObject *self, PyObject *args)
+static HPy mpl_tk_blit(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
 {
+    HPy h_interp = HPy_NULL, h_data_ptr = HPy_NULL;
     Tcl_Interp *interp;
     char const *photo_name;
     int height, width;
@@ -60,22 +62,46 @@ static PyObject *mpl_tk_blit(PyObject *self, PyObject *args)
     int x1, x2, y1, y2;
     Tk_PhotoHandle photo;
     Tk_PhotoImageBlock block;
-    if (!PyArg_ParseTuple(args, "O&s(iiO&)(iiii)(iiii):blit",
-                          convert_voidptr, &interp, &photo_name,
-                          &height, &width, convert_voidptr, &data_ptr,
-                          &o0, &o1, &o2, &o3,
-                          &x1, &x2, &y1, &y2)) {
-        goto exit;
+    HPy tuple1, tuple2, tuple3;
+    if (!HPyArg_Parse(ctx, NULL, args, nargs, "OsOOO:blit",
+                          &h_interp, &photo_name,
+                          &tuple1,
+                          &tuple2,
+                          &tuple3)) {
+        return HPy_NULL;
     }
+    int ret;
+    Arg_ParseTuple(ret, ctx, tuple1, "iiO:blit", &height, &width, &h_data_ptr)
+    h_data_ptr = HPy_Dup(ctx, h_data_ptr); // copy before closing tuple items
+    Arg_ParseTupleClose(ctx, tuple1);
+    if (!ret) {
+        HPy_Close(ctx, h_data_ptr);
+        return HPy_NULL;
+    }
+    if (!convert_voidptr(ctx, h_interp, &interp) || !convert_voidptr(ctx, h_data_ptr, &data_ptr)) {
+        if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "blit"); // TODO
+        HPy_Close(ctx, h_data_ptr);
+        return HPy_NULL;
+    }
+    HPy_Close(ctx, h_data_ptr);
+
     if (!(photo = TK_FIND_PHOTO(interp, photo_name))) {
-        PyErr_SetString(PyExc_ValueError, "Failed to extract Tk_PhotoHandle");
-        goto exit;
-    }
-    if (0 > y1 || y1 > y2 || y2 > height || 0 > x1 || x1 > x2 || x2 > width) {
-        PyErr_SetString(PyExc_ValueError, "Attempting to draw out of bounds");
-        goto exit;
+        HPyErr_SetString(ctx, ctx->h_ValueError, "Failed to extract Tk_PhotoHandle");
+        return HPy_NULL;
     }
 
+    Arg_ParseTupleAndClose(ret, ctx, tuple2, "iiii:blit", &o0, &o1, &o2, &o3)
+    if (!ret) {
+        return HPy_NULL;
+    }
+    Arg_ParseTupleAndClose(ret, ctx, tuple3, "iiii:blit", &x1, &x2, &y1, &y2)
+    if (!ret) {
+        return HPy_NULL;
+    }
+    if (0 > y1 || y1 > y2 || y2 > height || 0 > x1 || x1 > x2 || x2 > width) {
+        HPyErr_SetString(ctx, ctx->h_ValueError, "Attempting to draw out of bounds");
+        goto exit;
+    }
     block.pixelPtr = data_ptr + 4 * ((height - y2) * width + x1);
     block.width = x2 - x1;
     block.height = y2 - y1;
@@ -88,16 +114,18 @@ static PyObject *mpl_tk_blit(PyObject *self, PyObject *args)
     TK_PHOTO_PUT_BLOCK_NO_COMPOSITE(
         photo, &block, x1, height - y2, x2 - x1, y2 - y1);
 exit:
-    if (PyErr_Occurred()) {
-        return NULL;
+    if (HPyErr_Occurred(ctx)) {
+        return HPy_NULL;
     } else {
-        Py_RETURN_NONE;
+        return HPy_Dup(ctx, ctx->h_None);
     }
 }
 
-static PyMethodDef functions[] = {
-    { "blit", (PyCFunction)mpl_tk_blit, METH_VARARGS },
-    { NULL, NULL } /* sentinel */
+HPyDef_METH(mpl_tk_blit_def, "blit", mpl_tk_blit, HPyFunc_VARARGS)
+
+static HPyDef *module_defines[] = {
+    &mpl_tk_blit_def,
+    NULL
 };
 
 // Functions to fill global Tk function pointers by dynamic loading
@@ -123,7 +151,7 @@ int load_tk(T lib)
  * scan all modules in the running process for the Tk function names.
  */
 
-void load_tkinter_funcs(void)
+void load_tkinter_funcs(HPyContext *ctx)
 {
     // Load Tk functions by searching all modules in current process.
     HMODULE hMods[1024];
@@ -150,11 +178,11 @@ void load_tkinter_funcs(void)
  * dynamic library (module).
  */
 
-void load_tkinter_funcs(void)
+void load_tkinter_funcs(HPyContext *ctx)
 {
     // Load tkinter global funcs from tkinter compiled module.
     void *main_program = NULL, *tkinter_lib = NULL;
-    PyObject *module = NULL, *py_path = NULL, *py_path_b = NULL;
+    HPy module = HPy_NULL, py_path = HPy_NULL, py_path_b = HPy_NULL;
     char *path;
 
     // Try loading from the main program namespace first.
@@ -163,23 +191,23 @@ void load_tkinter_funcs(void)
         goto exit;
     }
     // Clear exception triggered when we didn't find symbols above.
-    PyErr_Clear();
+    HPyErr_Clear(ctx);
 
     // Handle PyPy first, as that import will correctly fail on CPython.
-    module = PyImport_ImportModule("_tkinter.tklib_cffi");   // PyPy
-    if (!module) {
-        PyErr_Clear();
-        module = PyImport_ImportModule("_tkinter");  // CPython
+    module = HPyImport_ImportModule(ctx, "_tkinter.tklib_cffi");   // PyPy
+    if (HPy_IsNull(module)) {
+        HPyErr_Clear(ctx);
+        module = HPyImport_ImportModule(ctx,"_tkinter");  // CPython
     }
-    if (!(module &&
-          (py_path = PyObject_GetAttrString(module, "__file__")) &&
-          (py_path_b = PyUnicode_EncodeFSDefault(py_path)) &&
-          (path = PyBytes_AsString(py_path_b)))) {
+    if (!(!HPy_IsNull(module) &&
+          !HPy_IsNull(py_path = HPy_GetAttr_s(ctx, module, "__file__")) &&
+          !HPy_IsNull(py_path_b = HPyUnicode_EncodeFSDefault(ctx, py_path)) &&
+          (path = HPyBytes_AsString(ctx, py_path_b)))) {
         goto exit;
     }
     tkinter_lib = dlopen(path, RTLD_LAZY);
     if (!tkinter_lib) {
-        PyErr_SetString(PyExc_RuntimeError, dlerror());
+        HPyErr_SetString(ctx, ctx->h_RuntimeError, dlerror());
         goto exit;
     }
     if (load_tk(tkinter_lib)) {
@@ -192,33 +220,43 @@ exit:
     // handles before handling errors.
     if ((main_program && dlclose(main_program))
         | (tkinter_lib && dlclose(tkinter_lib))) {
-        PyErr_SetString(PyExc_RuntimeError, dlerror());
+        HPyErr_SetString(ctx, ctx->h_RuntimeError, dlerror());
     }
-    Py_XDECREF(module);
-    Py_XDECREF(py_path);
-    Py_XDECREF(py_path_b);
+    HPy_Close(ctx, module);
+    HPy_Close(ctx, py_path);
+    HPy_Close(ctx, py_path_b);
 }
 #endif // end not Windows
 
-static PyModuleDef _tkagg_module = {
-    PyModuleDef_HEAD_INIT, "_tkagg", "", -1, functions, NULL, NULL, NULL, NULL
+static HPyModuleDef moduledef = {
+  .name = "_tkagg",
+  .doc = "",
+  .size = -1,
+  .defines = module_defines,
 };
 
-#pragma GCC visibility push(default)
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-PyMODINIT_FUNC PyInit__tkagg(void)
+#pragma GCC visibility push(default)
+HPy_MODINIT(_tkagg)
+static HPy init__tkagg_impl(HPyContext *ctx)
 {
-    load_tkinter_funcs();
-    if (PyErr_Occurred()) {
-        return NULL;
+    load_tkinter_funcs(ctx);
+    if (HPyErr_Occurred(ctx)) {
+        return HPy_NULL;
     } else if (!TK_FIND_PHOTO) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to load Tk_FindPhoto");
-        return NULL;
+        HPyErr_SetString(ctx, ctx->h_RuntimeError, "Failed to load Tk_FindPhoto");
+        return HPy_NULL;
     } else if (!TK_PHOTO_PUT_BLOCK_NO_COMPOSITE) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to load Tk_PhotoPutBlock_NoComposite");
-        return NULL;
+        HPyErr_SetString(ctx, ctx->h_RuntimeError, "Failed to load Tk_PhotoPutBlock_NoComposite");
+        return HPy_NULL;
     }
-    return PyModule_Create(&_tkagg_module);
+    return HPyModule_Create(ctx, &moduledef);
 }
 
 #pragma GCC visibility pop
+#ifdef __cplusplus
+}
+#endif
