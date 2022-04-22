@@ -1,4 +1,10 @@
 /* -*- mode: c++; c-basic-offset: 4 -*- */
+/*-----------------------------------------------------------------------------
+| Copyright (c) 2012- Matplotlib Development Team; All Rights Reserved
+| Copyright (c) 2022, Oracle and/or its affiliates.
+|
+| The full license is in the file LICENSE, distributed with this software.
+|----------------------------------------------------------------------------*/
 
 #ifndef MPL_PY_CONVERTERS_H
 #define MPL_PY_CONVERTERS_H

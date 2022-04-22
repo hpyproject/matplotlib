@@ -1,3 +1,9 @@
+/*-----------------------------------------------------------------------------
+| Copyright (c) 2012- Matplotlib Development Team; All Rights Reserved
+| Copyright (c) 2022, Oracle and/or its affiliates.
+|
+| The full license is in the file LICENSE, distributed with this software.
+|----------------------------------------------------------------------------*/
 #ifndef MPL_HPY_HELPERS_H
 #define MPL_HPY_HELPERS_H
 

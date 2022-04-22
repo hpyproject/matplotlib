@@ -1,3 +1,9 @@
+/*-----------------------------------------------------------------------------
+| Copyright (c) 2012- Matplotlib Development Team; All Rights Reserved
+| Copyright (c) 2022, Oracle and/or its affiliates.
+|
+| The full license is in the file LICENSE, distributed with this software.
+|----------------------------------------------------------------------------*/
 #define PY_SSIZE_T_CLEAN
 #ifdef __linux__
 #include <dlfcn.h>
