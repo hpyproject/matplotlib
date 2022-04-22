@@ -1,3 +1,6 @@
+# Copyright (c) 2012- Matplotlib Development Team; All Rights Reserved
+# Copyright (c) 2022, Oracle and/or its affiliates.
+# The full license is in the file LICENSE, distributed with this software.
 """
 The Matplotlib build options can be modified with a mplsetup.cfg file. See
 mplsetup.cfg.template for more information.

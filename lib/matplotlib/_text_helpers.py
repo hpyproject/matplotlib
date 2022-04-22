@@ -1,3 +1,6 @@
+# Copyright (c) 2012- Matplotlib Development Team; All Rights Reserved
+# Copyright (c) 2022, Oracle and/or its affiliates.
+# The full license is in the file LICENSE, distributed with this software.
 """
 Low-level text helper utilities.
 """

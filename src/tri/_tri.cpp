@@ -1,3 +1,9 @@
+/*-----------------------------------------------------------------------------
+| Copyright (c) 2012- Matplotlib Development Team; All Rights Reserved
+| Copyright (c) 2022, Oracle and/or its affiliates.
+|
+| The full license is in the file LICENSE, distributed with this software.
+|----------------------------------------------------------------------------*/
 /* This file contains liberal use of asserts to assist code development and
  * debugging.  Standard matplotlib builds disable asserts so they cause no
  * performance reduction.  To enable the asserts, you need to undefine the

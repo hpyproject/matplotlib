@@ -1,3 +1,6 @@
+# Copyright (c) 2012- Matplotlib Development Team; All Rights Reserved
+# Copyright (c) 2022, Oracle and/or its affiliates.
+# The full license is in the file LICENSE, distributed with this software.
 """
 Classes for the efficient drawing of large collections of objects that
 share most properties, e.g., a large number of line segments or

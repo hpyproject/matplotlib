@@ -1,3 +1,9 @@
+/*-----------------------------------------------------------------------------
+| Copyright (c) 2012- Matplotlib Development Team; All Rights Reserved
+| Copyright (c) 2022, Oracle and/or its affiliates.
+|
+| The full license is in the file LICENSE, distributed with this software.
+|----------------------------------------------------------------------------*/
 #include "mplutils.h"
 #include "ft2font.h"
 #include "py_converters.h"
