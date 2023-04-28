@@ -110,7 +110,25 @@ int pyiterable_to_vector_int(HPyContext *ctx, HPy object, void *address)
     return 1;
 }
 
-static HPy convert_ttf_to_ps(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+static const char convert_ttf_to_ps__doc__[] =
+        "convert_ttf_to_ps(filename, output, fonttype, glyph_ids)\n"
+        "\n"
+        "Converts the Truetype font into a Type 3 or Type 42 Postscript font, "
+        "optionally subsetting the font to only the desired set of characters.\n"
+        "\n"
+        "filename is the path to a TTF font file.\n"
+        "output is a Python file-like object with a write method that the Postscript "
+        "font data will be written to.\n"
+        "fonttype may be either 3 or 42.  Type 3 is a \"raw Postscript\" font. "
+        "Type 42 is an embedded Truetype font.  Glyph subsetting is not supported "
+        "for Type 42 fonts.\n"
+        "glyph_ids (optional) is a list of glyph ids (integers) to keep when "
+        "subsetting to a Type 3 font.  If glyph_ids is not provided or is None, "
+        "then all glyphs will be included.  If any of the glyphs specified are "
+        "composite glyphs, then the component glyphs will also be included.";
+
+HPyDef_METH(convert_ttf_to_ps, "convert_ttf_to_ps", HPyFunc_KEYWORDS, .doc = convert_ttf_to_ps__doc__)
+static HPy convert_ttf_to_ps_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs, HPy kwnames)
 {
     const char *filename;
     PythonFileWriter output;
@@ -123,9 +141,9 @@ static HPy convert_ttf_to_ps(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t
     HPyTracker ht;
     static const char *kwlist[] = { "filename", "output", "fonttype", "glyph_ids", NULL };
     if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
-                                     kwds,
+                                     kwnames,
                                      "OOi|O:convert_ttf_to_ps",
-                                     (const char **)kwlist,
+                                     kwlist,
                                      &h_filename,
                                      &h_output,
                                      &fonttype,
@@ -179,37 +197,20 @@ static HPy convert_ttf_to_ps(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-HPyDef_METH(convert_ttf_to_ps_def, "convert_ttf_to_ps", convert_ttf_to_ps, HPyFunc_KEYWORDS,
-.doc = "convert_ttf_to_ps(filename, output, fonttype, glyph_ids)\n"
-"\n"
-"Converts the Truetype font into a Type 3 or Type 42 Postscript font, "
-"optionally subsetting the font to only the desired set of characters.\n"
-"\n"
-"filename is the path to a TTF font file.\n"
-"output is a Python file-like object with a write method that the Postscript "
-"font data will be written to.\n"
-"fonttype may be either 3 or 42.  Type 3 is a \"raw Postscript\" font. "
-"Type 42 is an embedded Truetype font.  Glyph subsetting is not supported "
-"for Type 42 fonts.\n"
-"glyph_ids (optional) is a list of glyph ids (integers) to keep when "
-"subsetting to a Type 3 font.  If glyph_ids is not provided or is None, "
-"then all glyphs will be included.  If any of the glyphs specified are "
-"composite glyphs, then the component glyphs will also be included.")
 
 static HPyDef *module_defines[] = {
-    &convert_ttf_to_ps_def,
+    &convert_ttf_to_ps,
     NULL
 };
 
-static const char *module_docstring =
+static const char module_docstring[] =
     "Module to handle converting and subsetting TrueType "
     "fonts to Postscript Type 3, Postscript Type 42 and "
     "Pdf Type 3 fonts.";
 
 static HPyModuleDef moduledef = {
-  .name = "_ttconv_hpy",
   .doc = module_docstring,
-  .size = -1,
+  .size = 0,
   .defines = module_defines,
 };
 
@@ -218,16 +219,8 @@ extern "C" {
 #endif
 
 #pragma GCC visibility push(default)
-HPy_MODINIT(_ttconv_hpy)
-static HPy init__ttconv_hpy_impl(HPyContext *ctx)
-{
-    HPy m = HPyModule_Create(ctx, &moduledef);
-    if (HPy_IsNull(m)) {
-        return HPy_NULL;
-    }
 
-    return m;
-}
+HPy_MODINIT(_ttconv_hpy, moduledef)
 
 #pragma GCC visibility pop
 #ifdef __cplusplus

@@ -307,10 +307,8 @@ FT2Font::get_path(HPyContext *ctx)
     ft_outline_decomposer decomposer = {};
     FT_Error error = FT_Outline_Decompose(&face->glyph->outline, &ft_outline_funcs, &decomposer);
     if (error) {
-        // PyErr_Format(PyExc_RuntimeError,
-        //              "FT_Outline_Decompose failed with error 0x%x", error);
-        HPyErr_SetString(ctx, ctx->h_RuntimeError,
-                     "FT_Outline_Decompose failed with error");
+        HPyErr_Format(ctx, ctx->h_RuntimeError,
+                      "FT_Outline_Decompose failed with error 0x%x", error);
         return HPy_NULL;
     }
     if (!decomposer.index) {  // Don't append CLOSEPOLY to null glyphs.
@@ -331,10 +329,8 @@ FT2Font::get_path(HPyContext *ctx)
     decomposer.codes = codes.data();
     error = FT_Outline_Decompose(&face->glyph->outline, &ft_outline_funcs, &decomposer);
     if (error) {
-        // PyErr_Format(PyExc_RuntimeError,
-        //              "FT_Outline_Decompose failed with error 0x%x", error);
-        HPyErr_SetString(ctx, ctx->h_RuntimeError,
-                     "FT_Outline_Decompose failed with error");
+        HPyErr_Format(ctx, ctx->h_RuntimeError,
+                      "FT_Outline_Decompose failed with error 0x%x", error);
         return HPy_NULL;
     }
     *(decomposer.vertices++) = 0;

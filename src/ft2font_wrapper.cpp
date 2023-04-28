@@ -9,6 +9,7 @@
 #include "py_converters.h"
 #include "py_exceptions.h"
 #include "numpy_cpp.h"
+#include "hpy_utils.h"
 
 // From Python
 #include <structmember.h>
@@ -40,7 +41,8 @@ typedef struct
 
 HPyType_HELPERS(PyFT2Image)
 
-static HPy PyFT2Image_new(HPyContext *ctx, HPy type, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_SLOT(PyFT2Image_new, HPy_tp_new)
+static HPy PyFT2Image_new_impl(HPyContext *ctx, HPy type, const HPy *args, HPy_ssize_t nargs, HPy kwds)
 {
     PyFT2Image *self;
     HPy h_self = HPy_New(ctx, type, &self);
@@ -48,9 +50,10 @@ static HPy PyFT2Image_new(HPyContext *ctx, HPy type, HPy* args, HPy_ssize_t narg
     return h_self;
 }
 
-static int PyFT2Image_init(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_SLOT(PyFT2Image_init, HPy_tp_init)
+static int PyFT2Image_init_impl(HPyContext *ctx, HPy h_self, const HPy *args, HPy_ssize_t nargs, HPy kwds)
 {
-    PyFT2Image* self = (PyFT2Image*)HPy_AsStruct(ctx, h_self);
+    PyFT2Image* self = PyFT2Image_AsStruct(ctx, h_self);
     double width;
     double height;
 
@@ -63,21 +66,23 @@ static int PyFT2Image_init(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t n
     return 0;
 }
 
-static void PyFT2Image_dealloc(void *obj)
+HPyDef_SLOT(PyFT2Image_dealloc, HPy_tp_destroy)
+static void PyFT2Image_dealloc_impl(void *obj)
 {
     PyFT2Image* self = (PyFT2Image*)obj;
     delete self->x;
     // Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-const char *PyFT2Image_draw_rect__doc__ =
+static const char PyFT2Image_draw_rect__doc__[] =
     "draw_rect(x0, y0, x1, y1)\n"
     "--\n\n"
     "Draw an empty rectangle to the image.\n";
 
-static HPy PyFT2Image_draw_rect(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyFT2Image_draw_rect, "draw_path", HPyFunc_VARARGS, .doc = PyFT2Image_draw_rect__doc__)
+static HPy PyFT2Image_draw_rect_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyFT2Image* self = (PyFT2Image*)HPy_AsStruct(ctx, h_self);
+    PyFT2Image* self = PyFT2Image_AsStruct(ctx, h_self);
     double x0, y0, x1, y1;
 
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "dddd:draw_rect", &x0, &y0, &x1, &y1)) {
@@ -89,14 +94,15 @@ static HPy PyFT2Image_draw_rect(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssiz
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-const char *PyFT2Image_draw_rect_filled__doc__ =
+static const char PyFT2Image_draw_rect_filled__doc__[] =
     "draw_rect_filled(x0, y0, x1, y1)\n"
     "--\n\n"
     "Draw a filled rectangle to the image.\n";
 
-static HPy PyFT2Image_draw_rect_filled(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyFT2Image_draw_rect_filled, "draw_rect_filled", HPyFunc_VARARGS, .doc = PyFT2Image_draw_rect_filled__doc__)
+static HPy PyFT2Image_draw_rect_filled_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyFT2Image* self = (PyFT2Image*)HPy_AsStruct(ctx, h_self);
+    PyFT2Image* self = PyFT2Image_AsStruct(ctx, h_self);
     double x0, y0, x1, y1;
 
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "dddd:draw_rect_filled", &x0, &y0, &x1, &y1)) {
@@ -108,9 +114,10 @@ static HPy PyFT2Image_draw_rect_filled(HPyContext *ctx, HPy h_self, HPy* args, H
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-static int PyFT2Image_get_buffer(HPyContext *ctx, HPy h_self, HPy_buffer* buf, int flags)
+HPyDef_SLOT(PyFT2Image_get_buffer, HPy_bf_getbuffer)
+static int PyFT2Image_get_buffer_impl(HPyContext *ctx, HPy h_self, HPy_buffer* buf, int flags)
 {
-    PyFT2Image* self = (PyFT2Image*)HPy_AsStruct(ctx, h_self);
+    PyFT2Image* self = PyFT2Image_AsStruct(ctx, h_self);
     HPy_Dup(ctx, h_self);
     FT2Image *im = self->x;
 
@@ -133,30 +140,23 @@ static int PyFT2Image_get_buffer(HPyContext *ctx, HPy h_self, HPy_buffer* buf, i
     return 1;
 }
 
-static HPy h_PyFT2ImageType;
+static HPyGlobal PyFT2ImageType;
 
-HPyDef_SLOT(PyFT2Image_new_def, PyFT2Image_new, HPy_tp_new)
-HPyDef_SLOT(PyFT2Image_init_def, PyFT2Image_init, HPy_tp_init)
-HPyDef_SLOT(PyFT2Image_get_buffer_def, PyFT2Image_get_buffer, HPy_bf_getbuffer)
-HPyDef_SLOT(PyFT2Image_dealloc_def, PyFT2Image_dealloc, HPy_tp_destroy)
 
-HPyDef_METH(PyFT2Image_draw_rect_def, "draw_path", PyFT2Image_draw_rect, HPyFunc_VARARGS, .doc = PyFT2Image_draw_rect__doc__)
-HPyDef_METH(PyFT2Image_draw_rect_filled_def, "draw_rect_filled", PyFT2Image_draw_rect_filled, HPyFunc_VARARGS, .doc = PyFT2Image_draw_rect_filled__doc__)
-
-HPyDef *PyFT2Image_defines[] = {
+static HPyDef *PyFT2Image_defines[] = {
     // slots
-    &PyFT2Image_new_def,
-    &PyFT2Image_init_def,
-    &PyFT2Image_get_buffer_def,
-    &PyFT2Image_dealloc_def,
+    &PyFT2Image_new,
+    &PyFT2Image_init,
+    &PyFT2Image_get_buffer,
+    &PyFT2Image_dealloc,
 
     // methods
-    &PyFT2Image_draw_rect_def,
-    &PyFT2Image_draw_rect_filled_def,
+    &PyFT2Image_draw_rect,
+    &PyFT2Image_draw_rect_filled,
     NULL
 };
 
-HPyType_Spec PyFT2Image_type_spec = {
+static HPyType_Spec PyFT2Image_type_spec = {
     .name = "matplotlib.ft2font.FT2Image",
     .basicsize = sizeof(PyFT2Image),
     .flags = HPy_TPFLAGS_DEFAULT | HPy_TPFLAGS_BASETYPE,
@@ -184,13 +184,18 @@ typedef struct
 
 HPyType_HELPERS(PyGlyph)
 
-static HPy h_PyGlyphType;
+static HPyGlobal PyGlyphType;
 
 static HPy
 PyGlyph_new(HPyContext *ctx, const FT_Face &face, const FT_Glyph &glyph, size_t ind, long hinting_factor)
 {
     PyGlyph *self;
+    HPy h_PyGlyphType = HPyGlobal_Load(ctx, PyGlyphType);
     HPy h_self = HPy_New(ctx, h_PyGlyphType, &self);
+    HPy_Close(ctx, h_PyGlyphType);
+
+    if (HPy_IsNull(h_self))
+        return HPy_NULL;
 
     self->glyphInd = ind;
 
@@ -209,21 +214,13 @@ PyGlyph_new(HPyContext *ctx, const FT_Face &face, const FT_Glyph &glyph, size_t 
     return h_self;
 }
 
-static void PyGlyph_dealloc(void *obj)
+HPyDef_GET(PyGlyph_get_bbox, "bbox")
+static HPy PyGlyph_get_bbox_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    // Py_TYPE(self)->tp_free((PyObject *)self);
-}
-
-static HPy PyGlyph_get_bbox(HPyContext *ctx, HPy h_self, void *closure)
-{
-    PyGlyph* self = (PyGlyph*)HPy_AsStruct(ctx, h_self);
+    PyGlyph* self = PyGlyph_AsStruct(ctx, h_self);
     return HPy_BuildValue(ctx, 
         "llll", self->bbox.xMin, self->bbox.yMin, self->bbox.xMax, self->bbox.yMax);
 }
-
-HPyDef_SLOT(PyGlyph_dealloc_def, PyGlyph_dealloc, HPy_tp_destroy)
-
-HPyDef_GET(PyGlyph_get_bbox_get, "bbox", PyGlyph_get_bbox)
 
 HPyDef_MEMBER(width_member, "width", HPyMember_LONG, offsetof(PyGlyph, width), .readonly=1, .doc = "")
 HPyDef_MEMBER(height_member, "height", HPyMember_LONG, offsetof(PyGlyph, height), .readonly=1, .doc = "")
@@ -235,12 +232,9 @@ HPyDef_MEMBER(vertBearingX_member, "vertBearingX", HPyMember_LONG, offsetof(PyGl
 HPyDef_MEMBER(vertBearingY_member, "vertBearingY", HPyMember_LONG, offsetof(PyGlyph, vertBearingY), .readonly=1, .doc = "")
 HPyDef_MEMBER(vertAdvance_member, "vertAdvance", HPyMember_LONG, offsetof(PyGlyph, vertAdvance), .readonly=1, .doc = "")
 
-HPyDef *PyGlyph_defines[] = {
-    // slots
-    &PyGlyph_dealloc_def,
-    
+static HPyDef *PyGlyph_defines[] = {
     // getsets
-    &PyGlyph_get_bbox_get,
+    &PyGlyph_get_bbox,
 
     // members
     &width_member,
@@ -255,7 +249,7 @@ HPyDef *PyGlyph_defines[] = {
     NULL
 };
 
-HPyType_Spec PyGlyph_type_spec = {
+static HPyType_Spec PyGlyph_type_spec = {
     .name = "matplotlib.ft2font.Glyph",
     .basicsize = sizeof(PyGlyph),
     .flags = HPy_TPFLAGS_DEFAULT | HPy_TPFLAGS_BASETYPE,
@@ -279,37 +273,6 @@ typedef struct
 } PyFT2Font;
 
 HPyType_HELPERS(PyFT2Font)
-
-static HPy HPyCall(HPyContext *ctx, HPy obj, const char *func_name, HPy argtuple, HPy kwds) {
-    if (!HPy_HasAttr_s(ctx, obj, func_name)) {
-        return HPy_NULL;
-    }
-    HPy func = HPy_GetAttr_s(ctx, obj, func_name);
-    if (HPy_IsNull(func) || !HPyCallable_Check(ctx, func)) {
-        HPy_Close(ctx, func);
-        return HPy_NULL;
-    }
-    HPy result = HPy_CallTupleDict(ctx, func, argtuple, kwds);
-    if (HPy_IsNull(result)) {
-        HPy_Close(ctx, func);
-        return HPy_NULL;
-    }
-    return result;
-}
-
-static HPy HPyPackLongAndCallMethod(HPyContext *ctx, HPy obj, const char *func_name, unsigned long val) {
-    HPy h_val = HPyLong_FromUnsignedLong(ctx, val);
-    HPy tuple[] = {h_val};
-    HPy argtuple = HPyTuple_FromArray(ctx, tuple, 1);
-    HPy result = HPyCall(ctx, obj, func_name, argtuple, HPy_NULL);
-    HPy_Close(ctx, h_val);
-    if (HPy_IsNull(result)) {
-        HPy_Close(ctx, argtuple);
-        return HPy_NULL;
-    }
-    HPy_Close(ctx, argtuple);
-    return result;
-}
 
 static unsigned long read_from_file_callback(FT_Stream stream,
                                              unsigned long offset,
@@ -349,7 +312,7 @@ static void close_file_callback(FT_Stream stream)
     PyFT2Font *self = (PyFT2Font *)stream->descriptor.pointer;
     HPyContext *ctx = self->ctx;
     HPy close_result = HPy_NULL;
-    if (HPy_IsNull(close_result = HPyCall(ctx, self->py_file, "close", HPy_NULL, HPy_NULL))) {
+    if (HPy_IsNull(close_result = HPy_CallMethod_s(ctx, "close", &self->py_file, 1, HPy_NULL))) {
         goto exit;
     }
 exit:
@@ -360,9 +323,8 @@ exit:
     }
 }
 
-static HPy h_PyFT2FontType;
-
-static HPy PyFT2Font_new(HPyContext *ctx, HPy type, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_SLOT(PyFT2Font_new, HPy_tp_new)
+static HPy PyFT2Font_new_impl(HPyContext *ctx, HPy type, const HPy *args, HPy_ssize_t nargs, HPy kw)
 {
     PyFT2Font *self;
     HPy h_self = HPy_New(ctx, type, &self);
@@ -374,36 +336,7 @@ static HPy PyFT2Font_new(HPyContext *ctx, HPy type, HPy* args, HPy_ssize_t nargs
     return h_self;
 }
 
-
-static HPy HPyCallOpen(HPyContext *ctx, HPy open, HPy filename, const char *flags) {
-    HPy h_flags = HPyUnicode_FromString(ctx, flags);
-    HPy tuple[] = {filename, h_flags};
-    HPy argtuple = HPyTuple_FromArray(ctx, tuple, 2);
-    HPy_Close(ctx, h_flags);
-    HPy result = HPy_CallTupleDict(ctx, open, argtuple, HPy_NULL);
-    if (HPy_IsNull(result)) {
-        HPy_Close(ctx, argtuple);
-        return HPy_NULL;
-    }
-    HPy_Close(ctx, argtuple);
-    return result;
-}
-
-static HPy HPyCallMethodRead(HPyContext *ctx, HPy filename, const char *func_name, long size) {
-    HPy h_size = HPyLong_FromLong(ctx, size);
-    HPy tuple[] = {h_size};
-    HPy argtuple = HPyTuple_FromArray(ctx, tuple, 1);
-    HPy_Close(ctx, h_size);
-    HPy result = HPyCall(ctx, filename, func_name, argtuple, HPy_NULL);
-    if (HPy_IsNull(result)) {
-        HPy_Close(ctx, argtuple);
-        return HPy_NULL;
-    }
-    HPy_Close(ctx, argtuple);
-    return result;
-}
-
-const char *PyFT2Font_init__doc__ =
+static const char PyFT2Font_init__doc__[] =
     "FT2Font(ttffile)\n"
     "--\n\n"
     "Create a new FT2Font object.\n"
@@ -439,17 +372,18 @@ const char *PyFT2Font_init__doc__ =
     "postscript_name\n"
     "    PostScript name of the font.\n";
 
-static int PyFT2Font_init(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_SLOT(PyFT2Font_init, HPy_tp_init)
+static int PyFT2Font_init_impl(HPyContext *ctx, HPy h_self, const HPy *args, HPy_ssize_t nargs, HPy kwds)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
-    HPy filename = HPy_NULL, open = HPy_NULL, data = HPy_NULL;
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
+    HPy filename = HPy_NULL, data = HPy_NULL;
     FT_Open_Args open_args;
     long hinting_factor = 8;
     int kerning_factor = 0;
     const char *names[] = { "filename", "hinting_factor", "_kerning_factor", NULL };
 
     HPyTracker ht;
-    if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
+    if (!HPyArg_ParseKeywordsDict(ctx, &ht, args, nargs,
              kwds, "O|l$i:FT2Font", (const char **)names, &filename,
              &hinting_factor, &kerning_factor)) {
         return -1;
@@ -467,13 +401,13 @@ static int PyFT2Font_init(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t na
     open_args.stream = &self->stream;
 
     if (HPyBytes_Check(ctx, filename) || HPyUnicode_Check(ctx, filename)) {
-        if (HPy_IsNull(open = HPy_GetAttr_s(ctx, HPyImport_ImportModule(ctx, "builtins"), "open"))  // Borrowed reference.
-            || HPy_IsNull(self->py_file = HPyCallOpen(ctx, open, filename, "rb"))) {
+        self->py_file = HPy_Open(ctx, filename, "rb");
+        if (HPy_IsNull(self->py_file)) {
             goto exit;
         }
         self->stream.close = &close_file_callback;
     } else if (!HPy_HasAttr_s(ctx, filename, "read")
-               || HPy_IsNull(data = HPyCallMethodRead(ctx, filename, "read", 0))
+               || HPy_IsNull(data = HPyPackLongAndCallMethod(ctx, filename, "read", 0))
                || !HPyBytes_Check(ctx, data)) {
         HPyErr_SetString(ctx, ctx->h_TypeError,
                         "First argument must be a path or binary-mode file object");
@@ -500,7 +434,8 @@ exit:
     return HPyErr_Occurred(ctx) ? -1 : 0;
 }
 
-static void PyFT2Font_dealloc(void *obj)
+HPyDef_SLOT(PyFT2Font_dealloc, HPy_tp_destroy)
+static void PyFT2Font_dealloc_impl(void *obj)
 {
     PyFT2Font* self = (PyFT2Font*)obj;
     delete self->x;
@@ -509,27 +444,29 @@ static void PyFT2Font_dealloc(void *obj)
     // Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-const char *PyFT2Font_clear__doc__ =
+static const char PyFT2Font_clear__doc__[] =
     "clear()\n"
     "--\n\n"
     "Clear all the glyphs, reset for a new call to `.set_text`.\n";
 
-static HPy PyFT2Font_clear(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyFT2Font_clear, "clear", HPyFunc_NOARGS, .doc = PyFT2Font_clear__doc__)
+static HPy PyFT2Font_clear_impl(HPyContext *ctx, HPy h_self)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     CALL_CPP_HPY(ctx, "clear", (self->x->clear()));
 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-const char *PyFT2Font_set_size__doc__ =
+static const char PyFT2Font_set_size__doc__[] =
     "set_size(ptsize, dpi)\n"
     "--\n\n"
     "Set the point size and dpi of the text.\n";
 
-static HPy PyFT2Font_set_size(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyFT2Font_set_size, "set_size", HPyFunc_VARARGS, .doc = PyFT2Font_set_size__doc__)
+static HPy PyFT2Font_set_size_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     double ptsize;
     double dpi;
 
@@ -542,14 +479,15 @@ static HPy PyFT2Font_set_size(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-const char *PyFT2Font_set_charmap__doc__ =
+static const char PyFT2Font_set_charmap__doc__[] =
     "set_charmap(i)\n"
     "--\n\n"
     "Make the i-th charmap current.\n";
 
-static HPy PyFT2Font_set_charmap(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyFT2Font_set_charmap, "set_charmap", HPyFunc_VARARGS, .doc = PyFT2Font_set_charmap__doc__)
+static HPy PyFT2Font_set_charmap_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     int i;
 
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "i:set_charmap", &i)) {
@@ -561,14 +499,15 @@ static HPy PyFT2Font_set_charmap(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssi
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-const char *PyFT2Font_select_charmap__doc__ =
+static const char PyFT2Font_select_charmap__doc__[] =
     "select_charmap(i)\n"
     "--\n\n"
     "Select a charmap by its FT_Encoding number.\n";
 
-static HPy PyFT2Font_select_charmap(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyFT2Font_select_charmap, "select_charmap", HPyFunc_VARARGS, .doc = PyFT2Font_select_charmap__doc__)
+static HPy PyFT2Font_select_charmap_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     unsigned long i;
 
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "k:select_charmap", &i)) {
@@ -580,7 +519,7 @@ static HPy PyFT2Font_select_charmap(HPyContext *ctx, HPy h_self, HPy* args, HPy_
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-const char *PyFT2Font_get_kerning__doc__ =
+static const char PyFT2Font_get_kerning__doc__[] =
     "get_kerning(left, right, mode)\n"
     "--\n\n"
     "Get the kerning between *left* and *right* glyph indices.\n"
@@ -589,9 +528,10 @@ const char *PyFT2Font_get_kerning__doc__ =
     "  KERNING_UNFITTED - Return scaled but un-grid-fitted kerning distances\n"
     "  KERNING_UNSCALED - Return the kerning vector in original font units\n";
 
-static HPy PyFT2Font_get_kerning(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyFT2Font_get_kerning, "get_kerning", HPyFunc_VARARGS, .doc = PyFT2Font_get_kerning__doc__)
+static HPy PyFT2Font_get_kerning_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     FT_UInt left, right, mode;
     int result;
 
@@ -604,7 +544,7 @@ static HPy PyFT2Font_get_kerning(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssi
     return HPyLong_FromLong(ctx, result);
 }
 
-const char *PyFT2Font_set_text__doc__ =
+static const char PyFT2Font_set_text__doc__[] =
     "set_text(string, angle, flags=32)\n"
     "--\n\n"
     "Set the text *string* and *angle*.\n"
@@ -613,21 +553,22 @@ const char *PyFT2Font_set_text__doc__ =
     "You must call this before `.draw_glyphs_to_bitmap`.\n"
     "A sequence of x,y positions is returned.\n";
 
-static HPy PyFT2Font_set_text(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_METH(PyFT2Font_set_text, "set_text", HPyFunc_KEYWORDS, .doc = PyFT2Font_set_text__doc__)
+static HPy PyFT2Font_set_text_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs, HPy kwnames)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     HPy textobj;
     double angle = 0.0;
     FT_Int32 flags = FT_LOAD_FORCE_AUTOHINT;
     std::vector<double> xys;
-    const char *names[] = { "string", "angle", "flags", NULL };
+    static const char *names[] = { "string", "angle", "flags", NULL };
 
     /* This makes a technically incorrect assumption that FT_Int32 is
        int. In theory it can also be long, if the size of int is less
        than 32 bits. This is very unlikely on modern platforms. */
     HPyTracker ht;
     if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
-             kwds, "O|di:set_text", (const char **)names, &textobj, &angle, &flags)) {
+             kwnames, "O|di:set_text", names, &textobj, &angle, &flags)) {
         HPyTracker_Close(ctx, ht);
         return HPy_NULL;
     }
@@ -661,7 +602,7 @@ static HPy PyFT2Font_set_text(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_
         }
         size = HPyBytes_Size(ctx, textobj);
         codepoints.resize(size);
-        char *bytestr = HPyBytes_AsString(ctx, textobj);
+        const char *bytestr = HPyBytes_AsString(ctx, textobj);
         for (HPy_ssize_t i = 0; i < size; ++i) {
             codepoints[i] = bytestr[i];
         }
@@ -681,18 +622,19 @@ static HPy PyFT2Font_set_text(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_
     return convert_xys_to_array(ctx, xys);
 }
 
-const char *PyFT2Font_get_num_glyphs__doc__ =
+static const char PyFT2Font_get_num_glyphs__doc__[] =
     "get_num_glyphs()\n"
     "--\n\n"
     "Return the number of loaded glyphs.\n";
 
-static HPy PyFT2Font_get_num_glyphs(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyFT2Font_get_num_glyphs, "get_num_glyphs", HPyFunc_NOARGS, .doc = PyFT2Font_get_num_glyphs__doc__)
+static HPy PyFT2Font_get_num_glyphs_impl(HPyContext *ctx, HPy h_self)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_num_glyphs());
 }
 
-const char *PyFT2Font_load_char__doc__ =
+static const char PyFT2Font_load_char__doc__[] =
     "load_char(charcode, flags=32)\n"
     "--\n\n"
     "Load character with *charcode* in current fontfile and set glyph.\n"
@@ -709,19 +651,20 @@ const char *PyFT2Font_load_char__doc__ =
     "  vertBearingY   # top side bearing in vertical layouts\n"
     "  vertAdvance    # advance height for vertical layout\n";
 
-static HPy PyFT2Font_load_char(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_METH(PyFT2Font_load_char, "load_char", HPyFunc_KEYWORDS, .doc = PyFT2Font_load_char__doc__)
+static HPy PyFT2Font_load_char_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs, HPy kwnames)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     long charcode;
     FT_Int32 flags = FT_LOAD_FORCE_AUTOHINT;
-    const char *names[] = { "charcode", "flags", NULL };
+    static const char *names[] = { "charcode", "flags", NULL };
 
     /* This makes a technically incorrect assumption that FT_Int32 is
        int. In theory it can also be long, if the size of int is less
        than 32 bits. This is very unlikely on modern platforms. */
     HPyTracker ht;
     if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
-             kwds, "l|i:load_char", (const char **)names, &charcode, &flags)) {
+             kwnames, "l|i:load_char", names, &charcode, &flags)) {
         HPyTracker_Close(ctx, ht);
         return HPy_NULL;
     }
@@ -735,7 +678,7 @@ static HPy PyFT2Font_load_char(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize
                        self->x->get_hinting_factor());
 }
 
-const char *PyFT2Font_load_glyph__doc__ =
+static const char PyFT2Font_load_glyph__doc__[] =
     "load_glyph(glyphindex, flags=32)\n"
     "--\n\n"
     "Load character with *glyphindex* in current fontfile and set glyph.\n"
@@ -752,19 +695,20 @@ const char *PyFT2Font_load_glyph__doc__ =
     "  vertBearingY   # top side bearing in vertical layouts\n"
     "  vertAdvance    # advance height for vertical layout\n";
 
-static HPy PyFT2Font_load_glyph(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_METH(PyFT2Font_load_glyph, "load_glyph", HPyFunc_KEYWORDS, .doc = PyFT2Font_load_glyph__doc__)
+static HPy PyFT2Font_load_glyph_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs, HPy kwnames)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     FT_UInt glyph_index;
     FT_Int32 flags = FT_LOAD_FORCE_AUTOHINT;
-    const char *names[] = { "glyph_index", "flags", NULL };
+    static const char *names[] = { "glyph_index", "flags", NULL };
 
     /* This makes a technically incorrect assumption that FT_Int32 is
        int. In theory it can also be long, if the size of int is less
        than 32 bits. This is very unlikely on modern platforms. */
     HPyTracker ht;
     if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
-             kwds, "I|i:load_glyph", (const char **)names, &glyph_index, &flags)) {
+             kwnames, "I|i:load_glyph", names, &glyph_index, &flags)) {
         HPyTracker_Close(ctx, ht);
         return HPy_NULL;
     }
@@ -778,16 +722,17 @@ static HPy PyFT2Font_load_glyph(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssiz
                        self->x->get_hinting_factor());
 }
 
-const char *PyFT2Font_get_width_height__doc__ =
+static const char PyFT2Font_get_width_height__doc__[] =
     "get_width_height()\n"
     "--\n\n"
     "Get the width and height in 26.6 subpixels of the current string set by `.set_text`.\n"
     "The rotation of the string is accounted for.  To get width and height\n"
     "in pixels, divide these values by 64.\n";
 
-static HPy PyFT2Font_get_width_height(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyFT2Font_get_width_height, "get_width_height", HPyFunc_NOARGS, .doc = PyFT2Font_get_width_height__doc__)
+static HPy PyFT2Font_get_width_height_impl(HPyContext *ctx, HPy h_self)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     long width, height;
 
     CALL_CPP_HPY(ctx, "get_width_height", (self->x->get_width_height(&width, &height)));
@@ -795,15 +740,16 @@ static HPy PyFT2Font_get_width_height(HPyContext *ctx, HPy h_self)
     return HPy_BuildValue(ctx, "ll", width, height);
 }
 
-const char *PyFT2Font_get_bitmap_offset__doc__ =
+static const char PyFT2Font_get_bitmap_offset__doc__[] =
     "get_bitmap_offset()\n"
     "--\n\n"
     "Get the (x, y) offset in 26.6 subpixels for the bitmap if ink hangs left or below (0, 0).\n"
     "Since Matplotlib only supports left-to-right text, y is always 0.\n";
 
-static HPy PyFT2Font_get_bitmap_offset(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyFT2Font_get_bitmap_offset, "get_bitmap_offset", HPyFunc_NOARGS, .doc = PyFT2Font_get_bitmap_offset__doc__)
+static HPy PyFT2Font_get_bitmap_offset_impl(HPyContext *ctx, HPy h_self)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     long x, y;
 
     CALL_CPP_HPY(ctx, "get_bitmap_offset", (self->x->get_bitmap_offset(&x, &y)));
@@ -811,16 +757,17 @@ static HPy PyFT2Font_get_bitmap_offset(HPyContext *ctx, HPy h_self)
     return HPy_BuildValue(ctx, "ll", x, y);
 }
 
-const char *PyFT2Font_get_descent__doc__ =
+static const char PyFT2Font_get_descent__doc__[] =
     "get_descent()\n"
     "--\n\n"
     "Get the descent in 26.6 subpixels of the current string set by `.set_text`.\n"
     "The rotation of the string is accounted for.  To get the descent\n"
     "in pixels, divide this value by 64.\n";
 
-static HPy PyFT2Font_get_descent(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyFT2Font_get_descent, "get_descent", HPyFunc_NOARGS, .doc = PyFT2Font_get_descent__doc__)
+static HPy PyFT2Font_get_descent_impl(HPyContext *ctx, HPy h_self)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     long descent;
 
     CALL_CPP_HPY(ctx, "get_descent", (descent = self->x->get_descent()));
@@ -828,22 +775,23 @@ static HPy PyFT2Font_get_descent(HPyContext *ctx, HPy h_self)
     return HPyLong_FromLong(ctx, descent);
 }
 
-const char *PyFT2Font_draw_glyphs_to_bitmap__doc__ =
+static const char PyFT2Font_draw_glyphs_to_bitmap__doc__[] =
     "draw_glyphs_to_bitmap()\n"
     "--\n\n"
     "Draw the glyphs that were loaded by `.set_text` to the bitmap.\n"
     "The bitmap size will be automatically set to include the glyphs.\n";
 
-static HPy PyFT2Font_draw_glyphs_to_bitmap(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_METH(PyFT2Font_draw_glyphs_to_bitmap, "draw_glyphs_to_bitmap", HPyFunc_KEYWORDS, .doc = PyFT2Font_draw_glyphs_to_bitmap__doc__)
+static HPy PyFT2Font_draw_glyphs_to_bitmap_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs, HPy kwnames)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     HPy h_antialiased = HPy_NULL;
     bool antialiased = true;
-    const char *names[] = { "antialiased", NULL };
+    static const char *names[] = { "antialiased", NULL };
 
     HPyTracker ht;
-    if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs, kwds, "|O:draw_glyphs_to_bitmap",
-                                     (const char **)names, &h_antialiased)) {
+    if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs, kwnames, "|O:draw_glyphs_to_bitmap",
+                                     names, &h_antialiased)) {
         HPyTracker_Close(ctx, ht);
         return HPy_NULL;
     }
@@ -860,22 +808,23 @@ static HPy PyFT2Font_draw_glyphs_to_bitmap(HPyContext *ctx, HPy h_self, HPy* arg
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-const char *PyFT2Font_get_xys__doc__ =
+static const char PyFT2Font_get_xys__doc__[] =
     "get_xys()\n"
     "--\n\n"
     "Get the xy locations of the current glyphs.\n";
 
-static HPy PyFT2Font_get_xys(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_METH(PyFT2Font_get_xys, "get_xys", HPyFunc_KEYWORDS, .doc = PyFT2Font_get_xys__doc__)
+static HPy PyFT2Font_get_xys_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs, HPy kwnames)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     HPy h_antialiased = HPy_NULL;
     bool antialiased = true;
     std::vector<double> xys;
-    const char *names[] = { "antialiased", NULL };
+    static const char *names[] = { "antialiased", NULL };
 
     HPyTracker ht;
-    if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs, kwds, "|O:get_xys",
-                                     (const char **)names, &h_antialiased)) {
+    if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs, kwnames, "|O:get_xys",
+                                     names, &h_antialiased)) {
         HPyTracker_Close(ctx, ht);
         return HPy_NULL;
     }
@@ -893,7 +842,7 @@ static HPy PyFT2Font_get_xys(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t
 }
 
 
-const char *PyFT2Font_draw_glyph_to_bitmap__doc__ =
+static const char PyFT2Font_draw_glyph_to_bitmap__doc__[] =
     "draw_glyph_to_bitmap(bitmap, x, y, glyph)\n"
     "--\n\n"
     "Draw a single glyph to the bitmap at pixel locations x, y\n"
@@ -905,19 +854,20 @@ const char *PyFT2Font_draw_glyph_to_bitmap__doc__ =
     "who want to render individual glyphs (e.g., returned by `.load_char`)\n"
     "at precise locations.\n";
 
-static HPy PyFT2Font_draw_glyph_to_bitmap(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_METH(PyFT2Font_draw_glyph_to_bitmap, "draw_glyph_to_bitmap", HPyFunc_KEYWORDS, .doc = PyFT2Font_draw_glyph_to_bitmap__doc__)
+static HPy PyFT2Font_draw_glyph_to_bitmap_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs, HPy kwnames)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     double xd, yd;
     HPy h_image = HPy_NULL, h_glyph = HPy_NULL, h_antialiased = HPy_NULL;
     bool antialiased = true;
-    const char *names[] = { "image", "x", "y", "glyph", "antialiased", NULL };
+    static const char *names[] = { "image", "x", "y", "glyph", "antialiased", NULL };
 
     HPyTracker ht;
     if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
-                                     kwds,
+                                     kwnames,
                                      "OddO|O:draw_glyph_to_bitmap", // TODO '!'
-                                     (const char **)names,
+                                     names,
                                      &h_image,
                                      &xd,
                                      &yd,
@@ -927,12 +877,12 @@ static HPy PyFT2Font_draw_glyph_to_bitmap(HPyContext *ctx, HPy h_self, HPy* args
         return HPy_NULL;
     }
 
-    if (!HPy_TypeCheck(ctx, h_image, h_PyFT2ImageType)) {
+    if (!HPy_TypeCheck_g(ctx, h_image, PyFT2ImageType)) {
         HPyErr_SetString(ctx, ctx->h_TypeError, "arg must be FT2Image"); // TODO
         HPyTracker_Close(ctx, ht);
         return HPy_NULL;
     } 
-    if (!HPy_TypeCheck(ctx, h_glyph, h_PyGlyphType)) {
+    if (!HPy_TypeCheck_g(ctx, h_glyph, PyGlyphType)) {
         HPyErr_SetString(ctx, ctx->h_TypeError, "mismatch type Glyph"); // TODO
         HPyTracker_Close(ctx, ht);
         return HPy_NULL;
@@ -943,8 +893,8 @@ static HPy PyFT2Font_draw_glyph_to_bitmap(HPyContext *ctx, HPy h_self, HPy* args
         return HPy_NULL;
     }
 
-    PyFT2Image *image = (PyFT2Image*)HPy_AsStruct(ctx, h_image);
-    PyGlyph *glyph = (PyGlyph*)HPy_AsStruct(ctx, h_glyph);
+    PyFT2Image *image = PyFT2Image_AsStruct(ctx, h_image);
+    PyGlyph *glyph = PyGlyph_AsStruct(ctx, h_glyph);
     CALL_CPP_HPY(ctx, "draw_glyph_to_bitmap",
              self->x->draw_glyph_to_bitmap(*(image->x), xd, yd, glyph->glyphInd, antialiased));
 
@@ -952,7 +902,7 @@ static HPy PyFT2Font_draw_glyph_to_bitmap(HPyContext *ctx, HPy h_self, HPy* args
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-const char *PyFT2Font_get_glyph_name__doc__ =
+static const char PyFT2Font_get_glyph_name__doc__[] =
     "get_glyph_name(index)\n"
     "--\n\n"
     "Retrieve the ASCII name of a given glyph *index* in a face.\n"
@@ -961,9 +911,10 @@ const char *PyFT2Font_get_glyph_name__doc__ =
     "names (per FT_FACE_FLAG_GLYPH_NAMES), this returns a made-up name which\n"
     "does *not* roundtrip through `.get_name_index`.\n";
 
-static HPy PyFT2Font_get_glyph_name(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyFT2Font_get_glyph_name, "get_glyph_name", HPyFunc_VARARGS, .doc = PyFT2Font_get_glyph_name__doc__)
+static HPy PyFT2Font_get_glyph_name_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     unsigned int glyph_number;
     char buffer[128];
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "I:get_glyph_name", &glyph_number)) {
@@ -973,15 +924,16 @@ static HPy PyFT2Font_get_glyph_name(HPyContext *ctx, HPy h_self, HPy* args, HPy_
     return HPyUnicode_FromString(ctx, buffer);
 }
 
-const char *PyFT2Font_get_charmap__doc__ =
+static const char PyFT2Font_get_charmap__doc__[] =
     "get_charmap()\n"
     "--\n\n"
     "Return a dict that maps the character codes of the selected charmap\n"
     "(Unicode by default) to their corresponding glyph indices.\n";
 
-static HPy PyFT2Font_get_charmap(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyFT2Font_get_charmap, "get_charmap", HPyFunc_NOARGS, .doc = PyFT2Font_get_charmap__doc__)
+static HPy PyFT2Font_get_charmap_impl(HPyContext *ctx, HPy h_self)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     HPy charmap = HPyDict_New(ctx);
     if (HPy_IsNull(charmap)) {
         return HPy_NULL;
@@ -1005,14 +957,15 @@ static HPy PyFT2Font_get_charmap(HPyContext *ctx, HPy h_self)
 }
 
 
-const char *PyFT2Font_get_char_index__doc__ =
+static const char PyFT2Font_get_char_index__doc__[] =
     "get_char_index(codepoint)\n"
     "--\n\n"
     "Return the glyph index corresponding to a character *codepoint*.\n";
 
-static HPy PyFT2Font_get_char_index(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyFT2Font_get_char_index, "get_char_index", HPyFunc_VARARGS, .doc = PyFT2Font_get_char_index__doc__)
+static HPy PyFT2Font_get_char_index_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     FT_UInt index;
     FT_ULong ccode;
 
@@ -1026,16 +979,17 @@ static HPy PyFT2Font_get_char_index(HPyContext *ctx, HPy h_self, HPy* args, HPy_
 }
 
 
-const char *PyFT2Font_get_sfnt__doc__ =
+static const char PyFT2Font_get_sfnt__doc__[] =
     "get_sfnt()\n"
     "--\n\n"
     "Load the entire SFNT names table, as a dict whose keys are\n"
     "(platform-ID, ISO-encoding-scheme, language-code, and description)\n"
     "tuples.\n";
 
-static HPy PyFT2Font_get_sfnt(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyFT2Font_get_sfnt, "get_sfnt", HPyFunc_NOARGS, .doc = PyFT2Font_get_sfnt__doc__)
+static HPy PyFT2Font_get_sfnt_impl(HPyContext *ctx, HPy h_self)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
 
     if (!(self->x->get_face()->face_flags & FT_FACE_FLAG_SFNT)) {
         HPyErr_SetString(ctx, ctx->h_ValueError, "No SFNT name table");
@@ -1089,15 +1043,16 @@ static HPy PyFT2Font_get_sfnt(HPyContext *ctx, HPy h_self)
     return names;
 }
 
-const char *PyFT2Font_get_name_index__doc__ =
+static const char PyFT2Font_get_name_index__doc__[] =
     "get_name_index(name)\n"
     "--\n\n"
     "Return the glyph index of a given glyph *name*.\n"
     "The glyph index 0 means 'undefined character code'.\n";
 
-static HPy PyFT2Font_get_name_index(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyFT2Font_get_name_index, "get_name_index", HPyFunc_VARARGS, .doc = PyFT2Font_get_name_index__doc__)
+static HPy PyFT2Font_get_name_index_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     char *glyphname;
     long name_index;
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "s:get_name_index", &glyphname)) {
@@ -1114,14 +1069,15 @@ static HPy build_str(HPyContext *ctx, const char *v, HPy_ssize_t len){
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-const char *PyFT2Font_get_ps_font_info__doc__ =
+static const char PyFT2Font_get_ps_font_info__doc__[] =
     "get_ps_font_info()\n"
     "--\n\n"
     "Return the information in the PS Font Info structure.\n";
 
-static HPy PyFT2Font_get_ps_font_info(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyFT2Font_get_ps_font_info, "get_ps_font_info", HPyFunc_NOARGS, .doc = PyFT2Font_get_ps_font_info__doc__)
+static HPy PyFT2Font_get_ps_font_info_impl(HPyContext *ctx, HPy h_self)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     PS_FontInfoRec fontinfo;
 
     FT_Error error = FT_Get_PS_Font_Info(self->x->get_face(), &fontinfo);
@@ -1142,15 +1098,16 @@ static HPy PyFT2Font_get_ps_font_info(HPyContext *ctx, HPy h_self)
                          (unsigned int)fontinfo.underline_thickness);
 }
 
-const char *PyFT2Font_get_sfnt_table__doc__ =
+static const char PyFT2Font_get_sfnt_table__doc__[] =
     "get_sfnt_table(name)\n"
     "--\n\n"
     "Return one of the following SFNT tables: head, maxp, OS/2, hhea, "
     "vhea, post, or pclt.\n";
 
-static HPy PyFT2Font_get_sfnt_table(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyFT2Font_get_sfnt_table, "get_sfnt_table", HPyFunc_VARARGS, .doc = PyFT2Font_get_sfnt_table__doc__)
+static HPy PyFT2Font_get_sfnt_table_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     char *tagname;
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "s:get_sfnt_table", &tagname)) {
         return HPy_NULL;
@@ -1445,34 +1402,37 @@ static HPy PyFT2Font_get_sfnt_table(HPyContext *ctx, HPy h_self, HPy* args, HPy_
     }
 }
 
-const char *PyFT2Font_get_path__doc__ =
+static const char PyFT2Font_get_path__doc__[] =
     "get_path()\n"
     "--\n\n"
     "Get the path data from the currently loaded glyph as a tuple of vertices, "
     "codes.\n";
 
-static HPy PyFT2Font_get_path(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyFT2Font_get_path, "get_path", HPyFunc_NOARGS, .doc = PyFT2Font_get_path__doc__)
+static HPy PyFT2Font_get_path_impl(HPyContext *ctx, HPy h_self)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     CALL_CPP_HPY(ctx, "get_path", return self->x->get_path(ctx));
 }
 
-const char *PyFT2Font_get_image__doc__ =
+static const char PyFT2Font_get_image__doc__[] =
     "get_image()\n"
     "--\n\n"
     "Return the underlying image buffer for this font object.\n";
 
-static HPy PyFT2Font_get_image(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyFT2Font_get_image, "get_image", HPyFunc_NOARGS, .doc = PyFT2Font_get_image__doc__)
+static HPy PyFT2Font_get_image_impl(HPyContext *ctx, HPy h_self)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     FT2Image &im = self->x->get_image();
     npy_intp dims[] = {(npy_intp)im.get_height(), (npy_intp)im.get_width() };
     return HPy_FromPyObject(ctx, PyArray_SimpleNewFromData(2, dims, NPY_UBYTE, im.get_buffer()));
 }
 
-static HPy PyFT2Font_postscript_name(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_postscript_name, "postscript_name")
+static HPy PyFT2Font_postscript_name_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     const char *ps_name = FT_Get_Postscript_Name(self->x->get_face());
     if (ps_name == NULL) {
         ps_name = "UNAVAILABLE";
@@ -1481,15 +1441,17 @@ static HPy PyFT2Font_postscript_name(HPyContext *ctx, HPy h_self, void *closure)
     return HPyUnicode_FromString(ctx, ps_name);
 }
 
-static HPy PyFT2Font_num_faces(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_num_faces, "num_faces")
+static HPy PyFT2Font_num_faces_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->num_faces);
 }
 
-static HPy PyFT2Font_family_name(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_family_name, "family_name")
+static HPy PyFT2Font_family_name_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     const char *name = self->x->get_face()->family_name;
     if (name == NULL) {
         name = "UNAVAILABLE";
@@ -1497,9 +1459,10 @@ static HPy PyFT2Font_family_name(HPyContext *ctx, HPy h_self, void *closure)
     return HPyUnicode_FromString(ctx, name);
 }
 
-static HPy PyFT2Font_style_name(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_style_name, "style_name")
+static HPy PyFT2Font_style_name_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     const char *name = self->x->get_face()->style_name;
     if (name == NULL) {
         name = "UNAVAILABLE";
@@ -1507,116 +1470,131 @@ static HPy PyFT2Font_style_name(HPyContext *ctx, HPy h_self, void *closure)
     return HPyUnicode_FromString(ctx, name);
 }
 
-static HPy PyFT2Font_face_flags(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_face_flags, "face_flags")
+static HPy PyFT2Font_face_flags_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->face_flags);
 }
 
-static HPy PyFT2Font_style_flags(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_style_flags, "style_flags")
+static HPy PyFT2Font_style_flags_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->style_flags);
 }
 
-static HPy PyFT2Font_num_glyphs(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_num_glyphs, "num_glyphs")
+static HPy PyFT2Font_num_glyphs_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->num_glyphs);
 }
 
-static HPy PyFT2Font_num_fixed_sizes(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_num_fixed_sizes, "num_fixed_sizes")
+static HPy PyFT2Font_num_fixed_sizes_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->num_fixed_sizes);
 }
 
-static HPy PyFT2Font_num_charmaps(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_num_charmaps, "num_charmaps")
+static HPy PyFT2Font_num_charmaps_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->num_charmaps);
 }
 
-static HPy PyFT2Font_scalable(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_scalable, "scalable")
+static HPy PyFT2Font_scalable_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     if (FT_IS_SCALABLE(self->x->get_face())) {
         return HPy_Dup(ctx, ctx->h_True);
     }
     return HPy_Dup(ctx, ctx->h_False);
 }
 
-static HPy PyFT2Font_units_per_EM(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_units_per_EM, "units_per_EM")
+static HPy PyFT2Font_units_per_EM_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->units_per_EM);
 }
 
-static HPy PyFT2Font_get_bbox(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_bbox, "bbox")
+static HPy PyFT2Font_bbox_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     FT_BBox *bbox = &(self->x->get_face()->bbox);
 
     return HPy_BuildValue(ctx, "llll",
                          bbox->xMin, bbox->yMin, bbox->xMax, bbox->yMax);
 }
 
-static HPy PyFT2Font_ascender(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_ascender, "ascender")
+static HPy PyFT2Font_ascender_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->ascender);
 }
 
-static HPy PyFT2Font_descender(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_descender, "descender")
+static HPy PyFT2Font_descender_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->descender);
 }
 
-static HPy PyFT2Font_height(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_height, "height")
+static HPy PyFT2Font_height_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->height);
 }
 
-static HPy PyFT2Font_max_advance_width(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_max_advance_width, "max_advance_width")
+static HPy PyFT2Font_max_advance_width_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->max_advance_width);
 }
 
-static HPy PyFT2Font_max_advance_height(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_max_advance_height, "max_advance_height")
+static HPy PyFT2Font_max_advance_height_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->max_advance_height);
 }
 
-static HPy PyFT2Font_underline_position(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_underline_position, "underline_position")
+static HPy PyFT2Font_underline_position_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->underline_position);
 }
 
-static HPy PyFT2Font_underline_thickness(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_underline_thickness, "underline_thickness")
+static HPy PyFT2Font_underline_thickness_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     return HPyLong_FromLong(ctx, self->x->get_face()->underline_thickness);
 }
 
-static HPy PyFT2Font_fname(HPyContext *ctx, HPy h_self, void *closure)
+HPyDef_GET(PyFT2Font_fname, "fname")
+static HPy PyFT2Font_fname_get(HPyContext *ctx, HPy h_self, void *closure)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     if (!HPy_IsNull(self->fname)) {
-        HPy_Dup(ctx, self->fname);
-        return self->fname;
+        return HPy_Dup(ctx, self->fname);
     }
-
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-static int PyFT2Font_get_buffer(HPyContext *ctx, HPy h_self, HPy_buffer* buf, int flags)
+HPyDef_SLOT(PyFT2Font_get_buffer, HPy_bf_getbuffer)
+static int PyFT2Font_get_buffer_impl(HPyContext *ctx, HPy h_self, HPy_buffer* buf, int flags)
 {
-    PyFT2Font* self = (PyFT2Font*)HPy_AsStruct(ctx, h_self);
+    PyFT2Font* self = PyFT2Font_AsStruct(ctx, h_self);
     HPy_Dup(ctx, h_self);
     FT2Image &im = self->x->get_image();
 
@@ -1639,114 +1617,64 @@ static int PyFT2Font_get_buffer(HPyContext *ctx, HPy h_self, HPy_buffer* buf, in
     return 1;
 }
 
-HPyDef_SLOT(PyFT2Font_new_def, PyFT2Font_new, HPy_tp_new)
-HPyDef_SLOT(PyFT2Font_init_def, PyFT2Font_init, HPy_tp_init)
-HPyDef_SLOT(PyFT2Font_get_buffer_def, PyFT2Font_get_buffer, HPy_bf_getbuffer)
-HPyDef_SLOT(PyFT2Font_dealloc_def, PyFT2Font_dealloc, HPy_tp_destroy)
 
-HPyDef_GET(PyFT2Font_postscript_name_get, "postscript_name", PyFT2Font_postscript_name)
-HPyDef_GET(PyFT2Font_num_faces_get, "num_faces", PyFT2Font_num_faces)
-HPyDef_GET(PyFT2Font_family_name_get, "family_name", PyFT2Font_family_name)
-HPyDef_GET(PyFT2Font_style_name_get, "style_name", PyFT2Font_style_name)
-HPyDef_GET(PyFT2Font_face_flags_get, "face_flags", PyFT2Font_face_flags)
-HPyDef_GET(PyFT2Font_style_flags_get, "style_flags", PyFT2Font_style_flags)
-HPyDef_GET(PyFT2Font_num_glyphs_get, "num_glyphs", PyFT2Font_num_glyphs)
-HPyDef_GET(PyFT2Font_num_fixed_sizes_get, "num_fixed_sizes", PyFT2Font_num_fixed_sizes)
-HPyDef_GET(PyFT2Font_num_charmaps_get, "num_charmaps", PyFT2Font_num_charmaps)
-HPyDef_GET(PyFT2Font_scalable_get, "scalable", PyFT2Font_scalable)
-HPyDef_GET(PyFT2Font_units_per_EM_get, "units_per_EM", PyFT2Font_units_per_EM)
-HPyDef_GET(PyFT2Font_get_bbox_get, "bbox", PyFT2Font_get_bbox)
-HPyDef_GET(PyFT2Font_ascender_get, "ascender", PyFT2Font_ascender)
-HPyDef_GET(PyFT2Font_descender_get, "descender", PyFT2Font_descender)
-HPyDef_GET(PyFT2Font_height_get, "height", PyFT2Font_height)
-HPyDef_GET(PyFT2Font_max_advance_width_get, "max_advance_width", PyFT2Font_max_advance_width)
-HPyDef_GET(PyFT2Font_max_advance_height_get, "max_advance_height", PyFT2Font_max_advance_height)
-HPyDef_GET(PyFT2Font_underline_position_get, "underline_position", PyFT2Font_underline_position)
-HPyDef_GET(PyFT2Font_underline_thickness_get, "underline_thickness", PyFT2Font_underline_thickness)
-HPyDef_GET(PyFT2Font_fname_get, "fname", PyFT2Font_fname)
-
-HPyDef_METH(PyFT2Font_clear_meth, "clear", PyFT2Font_clear, HPyFunc_NOARGS, .doc = PyFT2Font_clear__doc__)
-HPyDef_METH(PyFT2Font_set_size_meth, "set_size", PyFT2Font_set_size, HPyFunc_VARARGS, .doc = PyFT2Font_set_size__doc__)
-HPyDef_METH(PyFT2Font_set_charmap_meth, "set_charmap", PyFT2Font_set_charmap, HPyFunc_VARARGS, .doc = PyFT2Font_set_charmap__doc__)
-HPyDef_METH(PyFT2Font_select_charmap_meth, "select_charmap", PyFT2Font_select_charmap, HPyFunc_VARARGS, .doc = PyFT2Font_select_charmap__doc__)
-HPyDef_METH(PyFT2Font_get_kerning_meth, "get_kerning", PyFT2Font_get_kerning, HPyFunc_VARARGS, .doc = PyFT2Font_get_kerning__doc__)
-HPyDef_METH(PyFT2Font_set_text_meth, "set_text", PyFT2Font_set_text, HPyFunc_KEYWORDS, .doc = PyFT2Font_set_text__doc__)
-HPyDef_METH(PyFT2Font_get_num_glyphs_meth, "get_num_glyphs", PyFT2Font_get_num_glyphs, HPyFunc_NOARGS, .doc = PyFT2Font_get_num_glyphs__doc__)
-HPyDef_METH(PyFT2Font_load_char_meth, "load_char", PyFT2Font_load_char, HPyFunc_KEYWORDS, .doc = PyFT2Font_load_char__doc__)
-HPyDef_METH(PyFT2Font_load_glyph_meth, "load_glyph", PyFT2Font_load_glyph, HPyFunc_KEYWORDS, .doc = PyFT2Font_load_glyph__doc__)
-HPyDef_METH(PyFT2Font_get_width_height_meth, "get_width_height", PyFT2Font_get_width_height, HPyFunc_NOARGS, .doc = PyFT2Font_get_width_height__doc__)
-HPyDef_METH(PyFT2Font_get_bitmap_offset_meth, "get_bitmap_offset", PyFT2Font_get_bitmap_offset, HPyFunc_NOARGS, .doc = PyFT2Font_get_bitmap_offset__doc__)
-HPyDef_METH(PyFT2Font_get_descent_meth, "get_descent", PyFT2Font_get_descent, HPyFunc_NOARGS, .doc = PyFT2Font_get_descent__doc__)
-HPyDef_METH(PyFT2Font_draw_glyphs_to_bitmap_meth, "draw_glyphs_to_bitmap", PyFT2Font_draw_glyphs_to_bitmap, HPyFunc_KEYWORDS, .doc = PyFT2Font_draw_glyphs_to_bitmap__doc__)
-HPyDef_METH(PyFT2Font_get_xys_meth, "get_xys", PyFT2Font_get_xys, HPyFunc_KEYWORDS, .doc = PyFT2Font_get_xys__doc__)
-HPyDef_METH(PyFT2Font_draw_glyph_to_bitmap_meth, "draw_glyph_to_bitmap", PyFT2Font_draw_glyph_to_bitmap, HPyFunc_KEYWORDS, .doc = PyFT2Font_draw_glyph_to_bitmap__doc__)
-HPyDef_METH(PyFT2Font_get_glyph_name_meth, "get_glyph_name", PyFT2Font_get_glyph_name, HPyFunc_VARARGS, .doc = PyFT2Font_get_glyph_name__doc__)
-HPyDef_METH(PyFT2Font_get_charmap_meth, "get_charmap", PyFT2Font_get_charmap, HPyFunc_NOARGS, .doc = PyFT2Font_get_charmap__doc__)
-HPyDef_METH(PyFT2Font_get_char_index_meth, "get_char_index", PyFT2Font_get_char_index, HPyFunc_VARARGS, .doc = PyFT2Font_get_char_index__doc__)
-HPyDef_METH(PyFT2Font_get_sfnt_meth, "get_sfnt", PyFT2Font_get_sfnt, HPyFunc_NOARGS, .doc = PyFT2Font_get_sfnt__doc__)
-HPyDef_METH(PyFT2Font_get_name_index_meth, "get_name_index", PyFT2Font_get_name_index, HPyFunc_VARARGS, .doc = PyFT2Font_get_name_index__doc__)
-HPyDef_METH(PyFT2Font_get_ps_font_info_meth, "get_ps_font_info", PyFT2Font_get_ps_font_info, HPyFunc_NOARGS, .doc = PyFT2Font_get_ps_font_info__doc__)
-HPyDef_METH(PyFT2Font_get_sfnt_table_meth, "get_sfnt_table", PyFT2Font_get_sfnt_table, HPyFunc_VARARGS, .doc = PyFT2Font_get_sfnt_table__doc__)
-HPyDef_METH(PyFT2Font_get_path_meth, "get_path", PyFT2Font_get_path, HPyFunc_NOARGS, .doc = PyFT2Font_get_path__doc__)
-HPyDef_METH(PyFT2Font_get_image_meth, "get_image", PyFT2Font_get_image, HPyFunc_NOARGS, .doc = PyFT2Font_get_image__doc__)
-
-HPyDef *PyFT2Font_defines[] = {
+static HPyDef *PyFT2Font_defines[] = {
     // slots
-    &PyFT2Font_new_def,
-    &PyFT2Font_init_def,
-    &PyFT2Font_get_buffer_def,
-    &PyFT2Font_dealloc_def,
+    &PyFT2Font_new,
+    &PyFT2Font_init,
+    &PyFT2Font_get_buffer,
+    &PyFT2Font_dealloc,
     // getset
-    &PyFT2Font_postscript_name_get,
-    &PyFT2Font_num_faces_get,
-    &PyFT2Font_family_name_get,
-    &PyFT2Font_style_name_get,
-    &PyFT2Font_face_flags_get,
-    &PyFT2Font_style_flags_get,
-    &PyFT2Font_num_glyphs_get,
-    &PyFT2Font_num_fixed_sizes_get,
-    &PyFT2Font_num_charmaps_get,
-    &PyFT2Font_scalable_get,
-    &PyFT2Font_units_per_EM_get,
-    &PyFT2Font_get_bbox_get,
-    &PyFT2Font_ascender_get,
-    &PyFT2Font_descender_get,
-    &PyFT2Font_height_get,
-    &PyFT2Font_max_advance_width_get,
-    &PyFT2Font_max_advance_height_get,
-    &PyFT2Font_underline_position_get,
-    &PyFT2Font_underline_thickness_get,
-    &PyFT2Font_fname_get,
+    &PyFT2Font_postscript_name,
+    &PyFT2Font_num_faces,
+    &PyFT2Font_family_name,
+    &PyFT2Font_style_name,
+    &PyFT2Font_face_flags,
+    &PyFT2Font_style_flags,
+    &PyFT2Font_num_glyphs,
+    &PyFT2Font_num_fixed_sizes,
+    &PyFT2Font_num_charmaps,
+    &PyFT2Font_scalable,
+    &PyFT2Font_units_per_EM,
+    &PyFT2Font_bbox,
+    &PyFT2Font_ascender,
+    &PyFT2Font_descender,
+    &PyFT2Font_height,
+    &PyFT2Font_max_advance_width,
+    &PyFT2Font_max_advance_height,
+    &PyFT2Font_underline_position,
+    &PyFT2Font_underline_thickness,
+    &PyFT2Font_fname,
 
     // methods
-    &PyFT2Font_clear_meth,
-    &PyFT2Font_set_size_meth,
-    &PyFT2Font_set_charmap_meth,
-    &PyFT2Font_select_charmap_meth,
-    &PyFT2Font_get_kerning_meth,
-    &PyFT2Font_set_text_meth,
-    &PyFT2Font_get_num_glyphs_meth,
-    &PyFT2Font_load_char_meth,
-    &PyFT2Font_load_glyph_meth,
-    &PyFT2Font_get_width_height_meth,
-    &PyFT2Font_get_bitmap_offset_meth,
-    &PyFT2Font_get_descent_meth,
-    &PyFT2Font_draw_glyphs_to_bitmap_meth,
-    &PyFT2Font_get_xys_meth,
-    &PyFT2Font_draw_glyph_to_bitmap_meth,
-    &PyFT2Font_get_glyph_name_meth,
-    &PyFT2Font_get_charmap_meth,
-    &PyFT2Font_get_char_index_meth,
-    &PyFT2Font_get_sfnt_meth,
-    &PyFT2Font_get_name_index_meth,
-    &PyFT2Font_get_ps_font_info_meth,
-    &PyFT2Font_get_sfnt_table_meth,
-    &PyFT2Font_get_path_meth,
-    &PyFT2Font_get_image_meth,
+    &PyFT2Font_clear,
+    &PyFT2Font_set_size,
+    &PyFT2Font_set_charmap,
+    &PyFT2Font_select_charmap,
+    &PyFT2Font_get_kerning,
+    &PyFT2Font_set_text,
+    &PyFT2Font_get_num_glyphs,
+    &PyFT2Font_load_char,
+    &PyFT2Font_load_glyph,
+    &PyFT2Font_get_width_height,
+    &PyFT2Font_get_bitmap_offset,
+    &PyFT2Font_get_descent,
+    &PyFT2Font_draw_glyphs_to_bitmap,
+    &PyFT2Font_get_xys,
+    &PyFT2Font_draw_glyph_to_bitmap,
+    &PyFT2Font_get_glyph_name,
+    &PyFT2Font_get_charmap,
+    &PyFT2Font_get_char_index,
+    &PyFT2Font_get_sfnt,
+    &PyFT2Font_get_name_index,
+    &PyFT2Font_get_ps_font_info,
+    &PyFT2Font_get_sfnt_table,
+    &PyFT2Font_get_path,
+    &PyFT2Font_get_image,
     NULL
 };
 
-HPyType_Spec PyFT2Font_type_spec = {
+static HPyType_Spec PyFT2Font_type_spec = {
     .name = "matplotlib.ft2font.FT2Font",
     .basicsize = sizeof(PyFT2Font),
     .flags = HPy_TPFLAGS_DEFAULT | HPy_TPFLAGS_BASETYPE,
@@ -1754,12 +1682,6 @@ HPyType_Spec PyFT2Font_type_spec = {
     .doc = PyFT2Font_init__doc__,
 };
 
-
-static HPyModuleDef moduledef = {
-    .name = "ft2font_hpy",
-    .doc = NULL,
-    .size = 0,
-};
 
 int add_dict_int(HPyContext *ctx, HPy dict, const char *key, long val)
 {
@@ -1802,44 +1724,35 @@ static int npy_import_array_hpy(HPyContext *ctx) {
     }
     return 1;
 }
-#ifdef __cplusplus
-extern "C" {
-#endif
 
-#pragma GCC visibility push(default)
-HPy_MODINIT(ft2font_hpy)
-static HPy init_ft2font_hpy_impl(HPyContext *ctx)
+HPyDef_SLOT(ft2font_hpy_exec, HPy_mod_exec)
+static int ft2font_hpy_exec_impl(HPyContext *ctx, HPy m)
 {
+    HPy tmp;
 
     if (!npy_import_array_hpy(ctx)) {
-        return HPy_NULL;
-    }
-
-    HPy m = HPyModule_Create(ctx, &moduledef);
-    if (HPy_IsNull(m)) {
-        return HPy_NULL;
+        return 1;
     }
 
     if (!HPyHelpers_AddType(ctx, m, "FT2Image", &PyFT2Image_type_spec, NULL)) {
-        HPy_Close(ctx, m);
-        return HPy_NULL;
+        return 1;
     }
 
-    h_PyFT2ImageType = HPy_GetAttr_s(ctx, m, "FT2Image");
+    tmp = HPy_GetAttr_s(ctx, m, "FT2Image");
+    HPyGlobal_Store(ctx, &PyFT2ImageType, tmp);
+    HPy_Close(ctx, tmp);
 
     if (!HPyHelpers_AddType(ctx, m, "PyGlyph", &PyGlyph_type_spec, NULL)) {
-        HPy_Close(ctx, m);
-        return HPy_NULL;
+        return 1;
     }
 
-    h_PyGlyphType = HPy_GetAttr_s(ctx, m, "PyGlyph"); // should be hidden
+    tmp = HPy_GetAttr_s(ctx, m, "PyGlyph"); // should be hidden
+    HPyGlobal_Store(ctx, &PyGlyphType, tmp);
+    HPy_Close(ctx, tmp);
 
     if (!HPyHelpers_AddType(ctx, m, "FT2Font", &PyFT2Font_type_spec, NULL)) {
-        HPy_Close(ctx, m);
-        return HPy_NULL;
+        return 1;
     }
-
-    h_PyFT2FontType = HPy_GetAttr_s(ctx, m, "FT2Font");
 
     if (add_dict_int(ctx, m, "SCALABLE", FT_FACE_FLAG_SCALABLE) ||
         add_dict_int(ctx, m, "FIXED_SIZES", FT_FACE_FLAG_FIXED_SIZES) ||
@@ -1877,8 +1790,7 @@ static HPy init_ft2font_hpy_impl(HPyContext *ctx)
         add_dict_int(ctx, m, "LOAD_TARGET_MONO", (unsigned long)FT_LOAD_TARGET_MONO) ||
         add_dict_int(ctx, m, "LOAD_TARGET_LCD", (unsigned long)FT_LOAD_TARGET_LCD) ||
         add_dict_int(ctx, m, "LOAD_TARGET_LCD_V", (unsigned long)FT_LOAD_TARGET_LCD_V)) {
-        HPy_Close(ctx, m);
-        return HPy_NULL;
+        return 1;
     }
 
     // initialize library
@@ -1886,8 +1798,7 @@ static HPy init_ft2font_hpy_impl(HPyContext *ctx)
 
     if (error) {
         HPyErr_SetString(ctx, ctx->h_RuntimeError, "Could not initialize the freetype2 library");
-        HPy_Close(ctx, m);
-        return HPy_NULL;
+        return 1;
     }
 
     {
@@ -1897,17 +1808,39 @@ static HPy init_ft2font_hpy_impl(HPyContext *ctx)
         FT_Library_Version(_ft2Library, &major, &minor, &patch);
         sprintf(version_string, "%d.%d.%d", major, minor, patch);
         if (add_dict_string(ctx, m, "__freetype_version__", version_string)) {
-            return HPy_NULL;
+            return 1;
         }
     }
 
     if (add_dict_string(ctx, m, "__freetype_build_type__", STRINGIFY(FREETYPE_BUILD_TYPE))) {
-        HPy_Close(ctx, m);
-        return HPy_NULL;
+        return 1;
     }
 
-    return m;
+    return 0;
 }
+
+static HPyDef *module_defines[] = {
+    &ft2font_hpy_exec,
+    NULL
+};
+
+static HPyGlobal *module_globals[] = {
+    &PyFT2ImageType,
+    &PyGlyphType,
+    NULL
+};
+
+static HPyModuleDef moduledef = {
+    .defines = module_defines,
+    .globals = module_globals,
+};
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#pragma GCC visibility push(default)
+HPy_MODINIT(ft2font_hpy, moduledef)
 
 #pragma GCC visibility pop
 #ifdef __cplusplus

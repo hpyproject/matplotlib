@@ -7,6 +7,7 @@
 #define NO_IMPORT_ARRAY
 #define PY_SSIZE_T_CLEAN
 #include "py_converters.h"
+#include "hpy_utils.h"
 #include "numpy_cpp.h"
 
 #include "agg_basics.h"
@@ -20,7 +21,7 @@ extern "C" {
 static int convert_string_enum_hpy(HPyContext *ctx, HPy obj, const char *name, const char **names, int *values, int *result)
 {
     HPy bytesobj;
-    char *str;
+    const char *str;
 
     if (HPy_IsNull(obj) || HPy_Is(ctx, obj, ctx->h_None)) {
         return 1;
@@ -34,8 +35,7 @@ static int convert_string_enum_hpy(HPyContext *ctx, HPy obj, const char *name, c
     } else if (HPyBytes_Check(ctx, obj)) {
         bytesobj = HPy_Dup(ctx, obj);
     } else {
-        // PyErr_Format(PyExc_TypeError, "%s must be str or bytes", name); TODO: implement HPyErr_Format
-        HPyErr_SetString(ctx, ctx->h_TypeError, "must be str or bytes");
+        HPyErr_Format(ctx, ctx->h_TypeError, "%s must be str or bytes", name);
         return 0;
     }
 
@@ -52,10 +52,9 @@ static int convert_string_enum_hpy(HPyContext *ctx, HPy obj, const char *name, c
             return 1;
         }
     }
-
-    // PyErr_Format(PyExc_ValueError, "invalid %s value", name); TODO: implement HPyErr_Format
-    HPyErr_SetString(ctx, ctx->h_ValueError, "invalid value");
     HPy_Close(ctx, bytesobj);
+
+    HPyErr_Format(ctx, ctx->h_ValueError, "invalid %s value", name);
     return 0;
 }
 
@@ -64,9 +63,8 @@ int convert_from_method_hpy(HPyContext *ctx, HPy obj, const char *name, converte
     if (!HPy_HasAttr_s(ctx, obj, name)) {
         return 1;
     }
-    HPy callable = HPy_GetAttr_s(ctx, obj, name);
-    HPy value = HPy_CallTupleDict(ctx, callable, HPy_NULL, HPy_NULL);
-    // value = PyObject_CallMethod(obj, name, NULL);
+    const HPy args[] = {obj};
+    HPy value = HPy_CallMethod_s(ctx, name, args, 1, HPy_NULL);
     if (HPy_IsNull(value)) {
         return 0;
     }
@@ -225,10 +223,25 @@ int convert_dashes_hpy(HPyContext *ctx, HPy dashobj, void *dashesp)
     Dashes *dashes = (Dashes *)dashesp;
 
     double dash_offset = 0.0;
+    HPy tmp;
     HPy dashes_seq = HPy_NULL;
 
-    HPy args[] = {dashobj};
-    if (!HPyArg_Parse(ctx, NULL, args, 1, "(dO):dashes", &dash_offset, &dashes_seq)) {
+    HPy_ssize_t n = HPy_Length(ctx, dashobj);
+    if (n != 2) {
+        HPyErr_SetString(ctx, ctx->h_TypeError, "expected two arguments");
+        return 0;
+    }
+    tmp = HPy_GetItem_i(ctx, dashobj, 0);
+    if (HPy_IsNull(tmp))
+        return 0;
+
+    dash_offset = HPyFloat_AsDouble(ctx, tmp);
+    HPy_Close(ctx, tmp);
+    if (dash_offset == -1.0 && HPyErr_Occurred(ctx))
+        return 0;
+
+    dashes_seq = HPy_GetItem_i(ctx, dashobj, 1);
+    if (HPy_IsNull(tmp)) {
         return 0;
     }
 
@@ -428,23 +441,33 @@ int convert_clippath_hpy(HPyContext *ctx, HPy clippath_tuple, void *clippathp)
     ClipPath *clippath = (ClipPath *)clippathp;
     py::PathIterator path;
     agg::trans_affine trans;
+    int res;
 
     if (!HPy_IsNull(clippath_tuple) && !HPy_Is(ctx, clippath_tuple, ctx->h_None)) {
-        HPy args[] = {clippath_tuple};
-        int res = HPyArg_Parse(ctx, NULL, args, 1, "(OO):clippath",
-                              &h_path,
-                              &h_trans);
-        if (res && (!convert_path_hpy(ctx, h_path, &clippath->path)
-                    || !convert_trans_affine_hpy(ctx, h_trans, &clippath->trans))) {
+        h_path = HPy_GetItem_i(ctx, clippath_tuple, 0);
+        if (HPy_IsNull(h_path)) {
+            res = 0;
+            goto finish;
+        }
+
+        h_trans = HPy_GetItem_i(ctx, clippath_tuple, 1);
+        if (HPy_IsNull(h_trans)) {
+            res = 0;
+            goto finish;
+        }
+        if (!convert_path_hpy(ctx, h_path, &clippath->path)
+                || !convert_trans_affine_hpy(ctx, h_trans, &clippath->trans)) {
             if (!HPyErr_Occurred(ctx)) HPyErr_SetString(ctx, ctx->h_SystemError, "clippath"); // TODO
             res = 0;
+            goto finish;
         }
-        if (!res) {
-            return 0;
-        }        
     }
+    res = 1;
 
-    return 1;
+finish:
+    HPy_Close(ctx, h_path);
+    HPy_Close(ctx, h_trans);
+    return res;
 }
 
 int convert_snap_hpy(HPyContext *ctx, HPy obj, void *snapp)
@@ -537,11 +560,9 @@ int convert_points_hpy(HPyContext *ctx, HPy obj, void *pointsp)
     }
 
     if (points->dim(1) != 2) {
-        // PyErr_Format(PyExc_ValueError,
-        //              "Points must be Nx2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-        //              points->dim(0), points->dim(1)); TODO: implement HPyErr_Format
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-                     "Points must be Nx2 array");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+                      "Points must be Nx2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+                      points->dim(0), points->dim(1));
         return 0;
     }
 
@@ -563,11 +584,9 @@ int convert_transforms_hpy(HPyContext *ctx, HPy obj, void *transp)
     }
 
     if (trans->dim(1) != 3 || trans->dim(2) != 3) {
-        // PyErr_Format(PyExc_ValueError,
-        //              "Transforms must be Nx3x3 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-        //              trans->dim(0), trans->dim(1), trans->dim(2)); TODO: implement HPyErr_Format
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-                     "Transforms must be Nx3x3 array");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+                      "Transforms must be Nx3x3 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+                      trans->dim(0), trans->dim(1), trans->dim(2));
         return 0;
     }
 
@@ -589,11 +608,9 @@ int convert_bboxes_hpy(HPyContext *ctx, HPy obj, void *bboxp)
     }
 
     if (bbox->dim(1) != 2 || bbox->dim(2) != 2) {
-        // PyErr_Format(PyExc_ValueError,
-        //              "Bbox array must be Nx2x2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-        //              bbox->dim(0), bbox->dim(1), bbox->dim(2)); TODO: implement HPyErr_Format
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-                     "Bbox array must be Nx2x2 array");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+                      "Bbox array must be Nx2x2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+                      bbox->dim(0), bbox->dim(1), bbox->dim(2));
         return 0;
     }
 
@@ -615,11 +632,9 @@ int convert_colors_hpy(HPyContext *ctx, HPy obj, void *colorsp)
     }
 
     if (colors->dim(1) != 4) {
-        // PyErr_Format(PyExc_ValueError,
-        //              "Colors array must be Nx4 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-        //              colors->dim(0), colors->dim(1)); TODO: implement HPyErr_Format
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-                     "Colors array must be Nx4 array");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+                      "Colors array must be Nx4 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+                      colors->dim(0), colors->dim(1));
         return 0;
     }
 

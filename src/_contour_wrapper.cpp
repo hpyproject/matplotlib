@@ -19,22 +19,26 @@ typedef struct
 HPyType_HELPERS(PyQuadContourGenerator)
 
 
-static HPy PyQuadContourGenerator_new(HPyContext *ctx, HPy type, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_SLOT(PyQuadContourGenerator_new, HPy_tp_new)
+static HPy PyQuadContourGenerator_new_impl(HPyContext *ctx, HPy type, const HPy *args, HPy_ssize_t nargs, HPy kwds)
 {
     PyQuadContourGenerator* self;
     HPy h_self = HPy_New(ctx, type, &self);
-    self->ptr = NULL;
+    if (HPy_IsNull(h_self))
+        return HPy_NULL;
+    assert(self->ptr == NULL);
     return h_self;
 }
 
-const char* PyQuadContourGenerator_init__doc__ =
+static const char PyQuadContourGenerator_init__doc__[] =
     "QuadContourGenerator(x, y, z, mask, corner_mask, chunk_size)\n"
     "--\n\n"
     "Create a new C++ QuadContourGenerator object\n";
 
-static int PyQuadContourGenerator_init(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_SLOT(PyQuadContourGenerator_init, HPy_tp_init)
+static int PyQuadContourGenerator_init_impl(HPyContext *ctx, HPy h_self, const HPy *args, HPy_ssize_t nargs, HPy kwds)
 {
-    PyQuadContourGenerator* self = (PyQuadContourGenerator*)HPy_AsStruct(ctx, h_self);
+    PyQuadContourGenerator* self = PyQuadContourGenerator_AsStruct(ctx, h_self);
     QuadContourGenerator::CoordinateArray x, y, z;
     QuadContourGenerator::MaskArray mask;
     bool corner_mask;
@@ -91,21 +95,26 @@ static int PyQuadContourGenerator_init(HPyContext *ctx, HPy h_self, HPy* args, H
     return 0;
 }
 
-static void PyQuadContourGenerator_dealloc(void* obj)
+HPyDef_SLOT(PyQuadContourGenerator_dealloc, HPy_tp_destroy)
+static void PyQuadContourGenerator_dealloc_impl(void* obj)
 {
     PyQuadContourGenerator* self = (PyQuadContourGenerator*)obj;
     delete self->ptr;
     // Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-const char* PyQuadContourGenerator_create_contour__doc__ =
+static const char PyQuadContourGenerator_create_contour__doc__[] =
     "create_contour(level)\n"
     "--\n\n"
     "Create and return a non-filled contour.";
 
-static HPy PyQuadContourGenerator_create_contour(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyQuadContourGenerator_create_contour,
+                "create_contour",
+                HPyFunc_VARARGS,
+                .doc = PyQuadContourGenerator_create_contour__doc__)
+static HPy PyQuadContourGenerator_create_contour_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyQuadContourGenerator* self = (PyQuadContourGenerator*)HPy_AsStruct(ctx, h_self);
+    PyQuadContourGenerator* self = PyQuadContourGenerator_AsStruct(ctx, h_self);
     double level;
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "d:create_contour", &level)) {
         return HPy_NULL;
@@ -116,14 +125,18 @@ static HPy PyQuadContourGenerator_create_contour(HPyContext *ctx, HPy h_self, HP
     return result;
 }
 
-const char* PyQuadContourGenerator_create_filled_contour__doc__ =
+static const char PyQuadContourGenerator_create_filled_contour__doc__[] =
     "create_filled_contour(lower_level, upper_level)\n"
     "--\n\n"
     "Create and return a filled contour";
 
-static HPy PyQuadContourGenerator_create_filled_contour(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyQuadContourGenerator_create_filled_contour,
+                "create_filled_contour",
+                HPyFunc_VARARGS,
+                .doc = PyQuadContourGenerator_create_filled_contour__doc__)
+static HPy PyQuadContourGenerator_create_filled_contour_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyQuadContourGenerator* self = (PyQuadContourGenerator*)HPy_AsStruct(ctx, h_self);
+    PyQuadContourGenerator* self = PyQuadContourGenerator_AsStruct(ctx, h_self);
     double lower_level, upper_level;
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "dd:create_filled_contour",
                           &lower_level, &upper_level)) {
@@ -144,33 +157,18 @@ static HPy PyQuadContourGenerator_create_filled_contour(HPyContext *ctx, HPy h_s
     return result;
 }
 
-HPyDef_SLOT(PyQuadContourGenerator_new_def, PyQuadContourGenerator_new, HPy_tp_new)
-HPyDef_SLOT(PyQuadContourGenerator_init_def, PyQuadContourGenerator_init, HPy_tp_init)
-HPyDef_SLOT(PyQuadContourGenerator_dealloc_def, PyQuadContourGenerator_dealloc, HPy_tp_destroy)
-
-HPyDef_METH(PyQuadContourGenerator_create_contour_def, 
-                "create_contour", 
-                PyQuadContourGenerator_create_contour, 
-                HPyFunc_VARARGS, 
-                .doc = PyQuadContourGenerator_create_contour__doc__)
-HPyDef_METH(PyQuadContourGenerator_create_filled_contour_def, 
-                "create_filled_contour", 
-                PyQuadContourGenerator_create_filled_contour, 
-                HPyFunc_VARARGS, 
-                .doc = PyQuadContourGenerator_create_filled_contour__doc__)
-
-HPyDef *PyQuadContourGenerator_defines[] = {
+static HPyDef *PyQuadContourGenerator_defines[] = {
     // slots
-    &PyQuadContourGenerator_new_def,
-    &PyQuadContourGenerator_init_def,
-    &PyQuadContourGenerator_dealloc_def,
+    &PyQuadContourGenerator_new,
+    &PyQuadContourGenerator_init,
+    &PyQuadContourGenerator_dealloc,
     // methods
-    &PyQuadContourGenerator_create_contour_def,
-    &PyQuadContourGenerator_create_filled_contour_def,
+    &PyQuadContourGenerator_create_contour,
+    &PyQuadContourGenerator_create_filled_contour,
     NULL
 };
 
-HPyType_Spec PyQuadContourGenerator_type_spec = {
+static HPyType_Spec PyQuadContourGenerator_type_spec = {
     .name = "matplotlib.QuadContourGenerator",
     .basicsize = sizeof(PyQuadContourGenerator),
     .flags = HPy_TPFLAGS_DEFAULT,
@@ -179,12 +177,6 @@ HPyType_Spec PyQuadContourGenerator_type_spec = {
 };
 
 /* Module */
-
-static HPyModuleDef moduledef = {
-    .name = "_contour_hpy",
-    .doc = NULL,
-    .size = 0,
-};
 
 // Logic is from NumPy's import_array()
 static int npy_import_array_hpy(HPyContext *ctx) {
@@ -196,30 +188,39 @@ static int npy_import_array_hpy(HPyContext *ctx) {
     return 1;
 }
 
+HPyDef_SLOT(_contour_hpy_exec, HPy_mod_exec)
+static int _contour_hpy_exec_impl(HPyContext *ctx, HPy m)
+{
+
+    if (!npy_import_array_hpy(ctx)) {
+        return 1;
+    }
+
+    if (!HPyHelpers_AddType(ctx, m, "QuadContourGenerator", &PyQuadContourGenerator_type_spec, NULL)) {
+        HPy_Close(ctx, m);
+        return 1;
+    }
+
+    return 0;
+}
+
+static HPyDef *module_defines[] = {
+    &_contour_hpy_exec,
+    NULL
+};
+
+static HPyModuleDef moduledef = {
+    .doc = NULL,
+    .size = 0,
+    .defines = module_defines,
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #pragma GCC visibility push(default)
-HPy_MODINIT(_contour_hpy)
-static HPy init__contour_hpy_impl(HPyContext *ctx)
-{
-
-    if (!npy_import_array_hpy(ctx)) {
-        return HPy_NULL;
-    }
-    HPy m = HPyModule_Create(ctx, &moduledef);
-    if (HPy_IsNull(m)) {
-        return HPy_NULL;
-    }
-
-    if (!HPyHelpers_AddType(ctx, m, "QuadContourGenerator", &PyQuadContourGenerator_type_spec, NULL)) {
-        HPy_Close(ctx, m);
-        return HPy_NULL;
-    }
-
-    return m;
-}
+HPy_MODINIT(_contour_hpy, moduledef)
 
 #pragma GCC visibility pop
 #ifdef __cplusplus

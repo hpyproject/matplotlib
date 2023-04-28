@@ -35,13 +35,13 @@ extern const char qh_version[];
 #define STR(x) #x
 
 
-// static const char* qhull_error_msg[6] = {
-//     "",                     /* 0 = qh_ERRnone */
-//     "input inconsistency",  /* 1 = qh_ERRinput */
-//     "singular input data",  /* 2 = qh_ERRsingular */
-//     "precision error",      /* 3 = qh_ERRprec */
-//     "insufficient memory",  /* 4 = qh_ERRmem */
-//     "internal error"};      /* 5 = qh_ERRqhull */
+static const char* qhull_error_msg[6] = {
+    "",                     /* 0 = qh_ERRnone */
+    "input inconsistency",  /* 1 = qh_ERRinput */
+    "singular input data",  /* 2 = qh_ERRsingular */
+    "precision error",      /* 3 = qh_ERRprec */
+    "insufficient memory",  /* 4 = qh_ERRmem */
+    "internal error"};      /* 5 = qh_ERRqhull */
 
 
 /* Return the indices of the 3 vertices that comprise the specified facet (i.e.
@@ -132,7 +132,7 @@ private:
  * If hide_qhull_errors is true then qhull error messages are discarded;
  * if it is false then they are written to stderr. */
 static HPy
-delaunay_impl(HPyContext *ctx, npy_intp npoints, const double* x, const double* y,
+_delaunay_impl(HPyContext *ctx, npy_intp npoints, const double* x, const double* y,
               bool hide_qhull_errors)
 {
     qhT qh_qh;                  /* qh variable type and name must be like */
@@ -185,12 +185,10 @@ delaunay_impl(HPyContext *ctx, npy_intp npoints, const double* x, const double* 
     exitcode = qh_new_qhull(qh, ndim, (int)npoints, points.data(), False,
                             (char*)"qhull d Qt Qbb Qc Qz", NULL, error_file);
     if (exitcode != qh_ERRnone) {
-        // PyErr_Format(PyExc_RuntimeError,
-        //              "Error in qhull Delaunay triangulation calculation: %s (exitcode=%d)%s",
-        //              qhull_error_msg[exitcode], exitcode,
-        //              hide_qhull_errors ? "; use python verbose option (-v) to see original qhull error." : "");
-        HPyErr_SetString(ctx, ctx->h_RuntimeError,
-                     "Error in qhull Delaunay triangulation calculation");
+        HPyErr_Format(ctx, ctx->h_RuntimeError,
+                      "Error in qhull Delaunay triangulation calculation: %s (exitcode=%d)%s",
+                      qhull_error_msg[exitcode], exitcode,
+                      hide_qhull_errors ? "; use python verbose option (-v) to see original qhull error." : "");
         return HPy_NULL;
     }
 
@@ -259,8 +257,9 @@ delaunay_impl(HPyContext *ctx, npy_intp npoints, const double* x, const double* 
 }
 
 /* Process Python arguments and call Delaunay implementation method. */
+HPyDef_METH(delaunay, "delaunay", HPyFunc_VARARGS, .doc = "")
 static HPy
-delaunay(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+delaunay_impl(HPyContext *ctx, HPy self, const HPy *args, size_t nargs)
 {
     HPy xarg = HPy_NULL;
     HPy yarg = HPy_NULL;
@@ -306,32 +305,19 @@ delaunay(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
     }
 
     CALL_CPP_HPY(ctx, "qhull.delaunay",
-             (ret = delaunay_impl(ctx, npoints, x, y, Py_VerboseFlag == 0)));
+             (ret = _delaunay_impl(ctx, npoints, x, y, Py_VerboseFlag == 0)));
 
     return ret;
 }
 
 /* Return qhull version string for assistance in debugging. */
+HPyDef_METH(version, "version", HPyFunc_NOARGS, .doc = "")
 static HPy
-version(HPyContext *ctx, HPy module)
+version_impl(HPyContext *ctx, HPy module)
 {
     return HPyBytes_FromString(ctx, qh_version);
 }
 
-HPyDef_METH(delaunay_def, "delaunay", delaunay, HPyFunc_VARARGS, .doc = "")
-HPyDef_METH(version_def, "version", version, HPyFunc_NOARGS, .doc = "")
-static HPyDef *module_defines[] = {
-    &delaunay_def,
-    &version_def,
-    NULL
-};
-
-static HPyModuleDef moduledef = {
-    .name = "_qhull_hpy",
-    .doc = "Computing Delaunay triangulations.\n",
-    .size = -1,
-    .defines = module_defines,
-};
 
 // Logic is from NumPy's import_array()
 static int npy_import_array_hpy(HPyContext *ctx) {
@@ -342,20 +328,35 @@ static int npy_import_array_hpy(HPyContext *ctx) {
     }
     return 1;
 }
+
+HPyDef_SLOT(_qhull_hpy_exec, HPy_mod_exec)
+static int _qhull_hpy_exec_impl(HPyContext *ctx, HPy m)
+{
+    if (!npy_import_array_hpy(ctx)) {
+        return 1;
+    }
+    return 0;
+}
+
+static HPyDef *module_defines[] = {
+    &_qhull_hpy_exec,
+    &delaunay,
+    &version,
+    NULL
+};
+
+static HPyModuleDef moduledef = {
+    .doc = "Computing Delaunay triangulations.\n",
+    .defines = module_defines,
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #pragma GCC visibility push(default)
-HPy_MODINIT(_qhull_hpy)
-static HPy init__qhull_hpy_impl(HPyContext *ctx)
-{
-    if (!npy_import_array_hpy(ctx)) {
-        return HPy_NULL;
-    }
 
-    return HPyModule_Create(ctx, &moduledef);
-}
+HPy_MODINIT(_qhull_hpy, moduledef)
 
 #pragma GCC visibility pop
 #ifdef __cplusplus

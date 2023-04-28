@@ -1136,7 +1136,7 @@ void __add_number(double val, char format_code, int precision,
 template <class PathIterator>
 bool __convert_to_string(PathIterator &path,
                          int precision,
-                         char **codes,
+                         const char **codes,
                          bool postfix,
                          std::string& buffer)
 {
@@ -1207,7 +1207,7 @@ bool convert_to_string(PathIterator &path,
                        bool simplify,
                        SketchParams sketch_params,
                        int precision,
-                       char **codes,
+                       const char **codes,
                        bool postfix,
                        std::string& buffer)
 {

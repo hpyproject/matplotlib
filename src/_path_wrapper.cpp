@@ -31,11 +31,12 @@ HPy convert_polygon_vector(HPyContext *ctx, std::vector<Polygon> &polygons)
     return HPyListBuilder_Build(ctx, pyresult);
 }
 
-static const char *Py_point_in_path__doc__ =
+static const char Py_point_in_path__doc__[] =
     "point_in_path(x, y, radius, path, trans)\n"
     "--\n\n";
 
-static HPy Py_point_in_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_point_in_path, "point_in_path", HPyFunc_VARARGS, .doc = Py_point_in_path__doc__);
+static HPy Py_point_in_path_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_path = HPy_NULL, h_trans = HPy_NULL;
     double x, y, r;
@@ -68,11 +69,12 @@ static HPy Py_point_in_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t 
     }
 }
 
-const char *Py_points_in_path__doc__ =
+static const char Py_points_in_path__doc__[] =
     "points_in_path(points, radius, path, trans)\n"
     "--\n\n";
 
-static HPy Py_points_in_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_points_in_path, "points_in_path", HPyFunc_VARARGS, .doc = Py_points_in_path__doc__);
+static HPy Py_points_in_path_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_points = HPy_NULL;
     HPy h_path = HPy_NULL;
@@ -106,11 +108,12 @@ static HPy Py_points_in_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t
     return HPy_FromPyObject(ctx, results.pyobj());
 }
 
-const char *Py_point_on_path__doc__ =
+static const char Py_point_on_path__doc__[] =
     "point_on_path(x, y, radius, path, trans)\n"
     "--\n\n";
 
-static HPy Py_point_on_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_point_on_path, "point_on_path", HPyFunc_VARARGS, .doc = Py_point_on_path__doc__);
+static HPy Py_point_on_path_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_path = HPy_NULL;
     HPy h_trans = HPy_NULL;
@@ -144,11 +147,12 @@ static HPy Py_point_on_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t 
     }
 }
 
-const char *Py_points_on_path__doc__ =
+static const char Py_points_on_path__doc__[] =
     "points_on_path(points, radius, path, trans)\n"
     "--\n\n";
 
-static HPy Py_points_on_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_points_on_path, "points_on_path", HPyFunc_VARARGS, .doc = Py_points_on_path__doc__);
+static HPy Py_points_on_path_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_points = HPy_NULL;
     HPy h_path = HPy_NULL;
@@ -182,11 +186,12 @@ static HPy Py_points_on_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t
     return HPy_FromPyObject(ctx, results.pyobj());
 }
 
-const char *Py_get_path_extents__doc__ =
+static const char Py_get_path_extents__doc__[] =
     "get_path_extents(path, trans)\n"
     "--\n\n";
 
-static HPy Py_get_path_extents(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_get_path_extents, "get_path_extents", HPyFunc_VARARGS, .doc = Py_get_path_extents__doc__);
+static HPy Py_get_path_extents_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_path = HPy_NULL;
     HPy h_trans = HPy_NULL;
@@ -219,11 +224,12 @@ static HPy Py_get_path_extents(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize
     return HPy_FromPyObject(ctx, extents.pyobj());
 }
 
-const char *Py_update_path_extents__doc__ =
+static const char Py_update_path_extents__doc__[] =
     "update_path_extents(path, trans, rect, minpos, ignore)\n"
     "--\n\n";
 
-static HPy Py_update_path_extents(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_update_path_extents, "update_path_extents", HPyFunc_VARARGS, .doc = Py_update_path_extents__doc__);
+static HPy Py_update_path_extents_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_path = HPy_NULL;
     HPy h_trans = HPy_NULL;
@@ -255,11 +261,9 @@ static HPy Py_update_path_extents(HPyContext *ctx, HPy h_self, HPy* args, HPy_ss
     }
 
     if (minpos.dim(0) != 2) {
-        // PyErr_Format(PyExc_ValueError,
-        //              "minpos must be of length 2, got %" NPY_INTP_FMT,
-        //              minpos.dim(0));
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-                     "minpos must be of length 2");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+                     "minpos must be of length 2, got %" NPY_INTP_FMT,
+                     minpos.dim(0));
         return HPy_NULL;
     }
 
@@ -308,12 +312,13 @@ static HPy Py_update_path_extents(HPyContext *ctx, HPy h_self, HPy* args, HPy_ss
                                 HPy_FromPyObject(ctx, outminpos.pyobj()), changed);
 }
 
-const char *Py_get_path_collection_extents__doc__ =
+static const char Py_get_path_collection_extents__doc__[] =
     "get_path_collection_extents("
     "master_transform, paths, transforms, offsets, offset_transform)\n"
     "--\n\n";
 
-static HPy Py_get_path_collection_extents(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_get_path_collection_extents, "get_path_collection_extents", HPyFunc_VARARGS, .doc = Py_get_path_collection_extents__doc__);
+static HPy Py_get_path_collection_extents_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_master_transform = HPy_NULL;
     HPy h_paths = HPy_NULL;
@@ -368,13 +373,14 @@ static HPy Py_get_path_collection_extents(HPyContext *ctx, HPy h_self, HPy* args
                                 HPy_FromPyObject(ctx, minpos.pyobj()));
 }
 
-const char *Py_point_in_path_collection__doc__ =
+static const char Py_point_in_path_collection__doc__[] =
     "point_in_path_collection("
     "x, y, radius, master_transform, paths, transforms, offsets, "
     "offset_trans, filled, offset_position)\n"
     "--\n\n";
 
-static HPy Py_point_in_path_collection(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_point_in_path_collection, "point_in_path_collection", HPyFunc_VARARGS, .doc = Py_point_in_path_collection__doc__);
+static HPy Py_point_in_path_collection_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_master_transform = HPy_NULL;
     HPy h_paths = HPy_NULL;
@@ -438,11 +444,12 @@ static HPy Py_point_in_path_collection(HPyContext *ctx, HPy h_self, HPy* args, H
     return HPy_FromPyObject(ctx, pyresult.pyobj());
 }
 
-const char *Py_path_in_path__doc__ =
+static const char Py_path_in_path__doc__[] =
     "path_in_path(path_a, trans_a, path_b, trans_b)\n"
     "--\n\n";
 
-static HPy Py_path_in_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_path_in_path, "path_in_path", HPyFunc_VARARGS, .doc = Py_path_in_path__doc__);
+static HPy Py_path_in_path_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_a = HPy_NULL;
     HPy h_atrans = HPy_NULL;
@@ -480,11 +487,12 @@ static HPy Py_path_in_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t n
     }
 }
 
-const char *Py_clip_path_to_rect__doc__ =
+static const char Py_clip_path_to_rect__doc__[] =
     "clip_path_to_rect(path, rect, inside)\n"
     "--\n\n";
 
-static HPy Py_clip_path_to_rect(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_clip_path_to_rect, "clip_path_to_rect", HPyFunc_VARARGS, .doc = Py_clip_path_to_rect__doc__);
+static HPy Py_clip_path_to_rect_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_path = HPy_NULL;
     HPy h_rect = HPy_NULL;
@@ -514,11 +522,12 @@ static HPy Py_clip_path_to_rect(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssiz
     return convert_polygon_vector(ctx, result);
 }
 
-const char *Py_affine_transform__doc__ =
+static const char Py_affine_transform__doc__[] =
     "affine_transform(points, trans)\n"
     "--\n\n";
 
-static HPy Py_affine_transform(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_affine_transform, "affine_transform", HPyFunc_VARARGS, .doc = Py_affine_transform__doc__);
+static HPy Py_affine_transform_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy vertices_obj = HPy_NULL;
     HPy h_trans = HPy_NULL;
@@ -560,11 +569,12 @@ static HPy Py_affine_transform(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize
     }
 }
 
-const char *Py_count_bboxes_overlapping_bbox__doc__ =
+static const char Py_count_bboxes_overlapping_bbox__doc__[] =
     "count_bboxes_overlapping_bbox(bbox, bboxes)\n"
     "--\n\n";
 
-static HPy Py_count_bboxes_overlapping_bbox(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_count_bboxes_overlapping_bbox, "count_bboxes_overlapping_bbox", HPyFunc_VARARGS, .doc = Py_count_bboxes_overlapping_bbox__doc__);
+static HPy Py_count_bboxes_overlapping_bbox_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_bbox = HPy_NULL;
     HPy h_bboxes = HPy_NULL;
@@ -591,11 +601,12 @@ static HPy Py_count_bboxes_overlapping_bbox(HPyContext *ctx, HPy h_self, HPy* ar
     return HPyLong_FromLong(ctx, result);
 }
 
-const char *Py_path_intersects_path__doc__ =
+static const char Py_path_intersects_path__doc__[] =
     "path_intersects_path(path1, path2, filled=False)\n"
     "--\n\n";
 
-static HPy Py_path_intersects_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_METH(Py_path_intersects_path, "path_intersects_path", HPyFunc_KEYWORDS, .doc = Py_path_intersects_path__doc__);
+static HPy Py_path_intersects_path_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs, HPy kwnames)
 {
     HPy h_p1 = HPy_NULL;
     HPy h_p2 = HPy_NULL;
@@ -604,14 +615,14 @@ static HPy Py_path_intersects_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_s
     agg::trans_affine t1;
     agg::trans_affine t2;
     int filled = 0;
-    const char *names[] = { "p1", "p2", "filled", NULL };
+    static const char *names[] = { "p1", "p2", "filled", NULL };
     bool result;
 
     HPyTracker ht;
     if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
-                                     kwds,
+                                     kwnames,
                                      "OOi:path_intersects_path",
-                                     (const char **)names,
+                                     names,
                                      &h_p1,
                                      &h_p2,
                                      &filled)) {
@@ -647,26 +658,27 @@ error:
     return HPy_NULL;
 }
 
-const char *Py_path_intersects_rectangle__doc__ =
+static const char Py_path_intersects_rectangle__doc__[] =
     "path_intersects_rectangle("
     "path, rect_x1, rect_y1, rect_x2, rect_y2, filled=False)\n"
     "--\n\n";
 
-static HPy Py_path_intersects_rectangle(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_METH(Py_path_intersects_rectangle, "path_intersects_rectangle", HPyFunc_KEYWORDS, .doc = Py_path_intersects_rectangle__doc__);
+static HPy Py_path_intersects_rectangle_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs, HPy kwnames)
 {
     HPy h_path = HPy_NULL;
     HPy h_filled = HPy_NULL;
     py::PathIterator path;
     double rect_x1, rect_y1, rect_x2, rect_y2;
     bool filled = false;
-    const char *names[] = { "path", "rect_x1", "rect_y1", "rect_x2", "rect_y2", "filled", NULL };
+    static const char *names[] = { "path", "rect_x1", "rect_y1", "rect_x2", "rect_y2", "filled", NULL };
     bool result;
 
     HPyTracker ht;
     if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
-                                     kwds,
+                                     kwnames,
                                      "Odddd|O:path_intersects_rectangle",
-                                     (const char **)names,
+                                     names,
                                      &h_path,
                                      &rect_x1,
                                      &rect_y1,
@@ -695,11 +707,12 @@ error:
     return HPy_NULL;
 }
 
-const char *Py_convert_path_to_polygons__doc__ =
+static const char Py_convert_path_to_polygons__doc__[] =
     "convert_path_to_polygons(path, trans, width=0, height=0)\n"
     "--\n\n";
 
-static HPy Py_convert_path_to_polygons(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_METH(Py_convert_path_to_polygons, "convert_path_to_polygons", HPyFunc_KEYWORDS, .doc = Py_convert_path_to_polygons__doc__);
+static HPy Py_convert_path_to_polygons_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs, HPy kwnames)
 {
     HPy h_path = HPy_NULL;
     HPy h_trans = HPy_NULL;
@@ -708,13 +721,13 @@ static HPy Py_convert_path_to_polygons(HPyContext *ctx, HPy h_self, HPy* args, H
     double width = 0.0, height = 0.0;
     int closed_only = 1;
     std::vector<Polygon> result;
-    const char *names[] = { "path", "transform", "width", "height", "closed_only", NULL };
+    static const char *names[] = { "path", "transform", "width", "height", "closed_only", NULL };
 
     HPyTracker ht;
     if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
-                                     kwds,
+                                     kwnames,
                                      "OO|ddi:convert_path_to_polygons",
-                                     (const char **)names,
+                                     names,
                                      &h_path,
                                      &h_trans,
                                      &width,
@@ -739,13 +752,14 @@ error:
     return HPy_NULL;
 }
 
-const char *Py_cleanup_path__doc__ =
+static const char Py_cleanup_path__doc__[] =
     "cleanup_path("
     "path, trans, remove_nans, clip_rect, snap_mode, stroke_width, simplify, "
     "return_curves, sketch)\n"
     "--\n\n";
 
-static HPy Py_cleanup_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_cleanup_path, "cleanup_path", HPyFunc_VARARGS, .doc = Py_cleanup_path__doc__);
+static HPy Py_cleanup_path_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_path = HPy_NULL;
     HPy h_trans = HPy_NULL;
@@ -835,7 +849,7 @@ static HPy Py_cleanup_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t n
                             HPy_FromPyObject(ctx, pycodes.pyobj()));
 }
 
-const char *Py_convert_to_string__doc__ =
+static const char Py_convert_to_string__doc__[] =
     "convert_to_string("
     "path, trans, clip_rect, simplify, sketch, precision, codes, postfix)\n"
     "--\n\n"
@@ -865,7 +879,8 @@ const char *Py_convert_to_string__doc__ =
     "    Whether the opcode comes after the values (True) or before (False).\n"
     ;
 
-static HPy Py_convert_to_string(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(Py_convert_to_string, "convert_to_string", HPyFunc_VARARGS, .doc = Py_convert_to_string__doc__);
+static HPy Py_convert_to_string_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_path = HPy_NULL;
     HPy h_trans = HPy_NULL;
@@ -880,7 +895,7 @@ static HPy Py_convert_to_string(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssiz
     bool simplify = false;
     SketchParams sketch;
     int precision;
-    char *codes[5];
+    const char *codes[5];
     bool postfix;
     std::string buffer;
     bool status;
@@ -952,12 +967,13 @@ static HPy Py_convert_to_string(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssiz
 }
 
 
-const char *Py_is_sorted__doc__ =
+static const char Py_is_sorted__doc__[] =
     "is_sorted(array)\n"
     "--\n\n"
     "Return whether the 1D *array* is monotonically increasing, ignoring NaNs.\n";
 
-static HPy Py_is_sorted(HPyContext *ctx, HPy self, HPy obj)
+HPyDef_METH(Py_is_sorted, "is_sorted", HPyFunc_O, .doc = Py_is_sorted__doc__);
+static HPy Py_is_sorted_impl(HPyContext *ctx, HPy self, HPy obj)
 {
     npy_intp size;
     bool result;
@@ -1038,55 +1054,6 @@ static HPy Py_is_sorted(HPyContext *ctx, HPy self, HPy obj)
 }
 
 
-HPyDef_METH(Py_point_in_path_def, "point_in_path", Py_point_in_path, HPyFunc_VARARGS, .doc = Py_point_in_path__doc__);
-HPyDef_METH(Py_points_in_path_def, "points_in_path", Py_points_in_path, HPyFunc_VARARGS, .doc = Py_points_in_path__doc__);
-HPyDef_METH(Py_point_on_path_def, "point_on_path", Py_point_on_path, HPyFunc_VARARGS, .doc = Py_point_on_path__doc__);
-HPyDef_METH(Py_points_on_path_def, "points_on_path", Py_points_on_path, HPyFunc_VARARGS, .doc = Py_points_on_path__doc__);
-HPyDef_METH(Py_get_path_extents_def, "get_path_extents", Py_get_path_extents, HPyFunc_VARARGS, .doc = Py_get_path_extents__doc__);
-HPyDef_METH(Py_update_path_extents_def, "update_path_extents", Py_update_path_extents, HPyFunc_VARARGS, .doc = Py_update_path_extents__doc__);
-HPyDef_METH(Py_get_path_collection_extents_def, "get_path_collection_extents", Py_get_path_collection_extents, HPyFunc_VARARGS, .doc = Py_get_path_collection_extents__doc__);
-HPyDef_METH(Py_point_in_path_collection_def, "point_in_path_collection", Py_point_in_path_collection, HPyFunc_VARARGS, .doc = Py_point_in_path_collection__doc__);
-HPyDef_METH(Py_path_in_path_def, "path_in_path", Py_path_in_path, HPyFunc_VARARGS, .doc = Py_path_in_path__doc__);
-HPyDef_METH(Py_clip_path_to_rect_def, "clip_path_to_rect", Py_clip_path_to_rect, HPyFunc_VARARGS, .doc = Py_clip_path_to_rect__doc__);
-HPyDef_METH(Py_affine_transform_def, "affine_transform", Py_affine_transform, HPyFunc_VARARGS, .doc = Py_affine_transform__doc__);
-HPyDef_METH(Py_count_bboxes_overlapping_bbox_def, "count_bboxes_overlapping_bbox", Py_count_bboxes_overlapping_bbox, HPyFunc_VARARGS, .doc = Py_count_bboxes_overlapping_bbox__doc__);
-HPyDef_METH(Py_path_intersects_path_def, "path_intersects_path", Py_path_intersects_path, HPyFunc_KEYWORDS, .doc = Py_path_intersects_path__doc__);
-HPyDef_METH(Py_path_intersects_rectangle_def, "path_intersects_rectangle", Py_path_intersects_rectangle, HPyFunc_KEYWORDS, .doc = Py_path_intersects_rectangle__doc__);
-HPyDef_METH(Py_convert_path_to_polygons_def, "convert_path_to_polygons", Py_convert_path_to_polygons, HPyFunc_KEYWORDS, .doc = Py_convert_path_to_polygons__doc__);
-HPyDef_METH(Py_cleanup_path_def, "cleanup_path", Py_cleanup_path, HPyFunc_VARARGS, .doc = Py_cleanup_path__doc__);
-HPyDef_METH(Py_convert_to_string_def, "convert_to_string", Py_convert_to_string, HPyFunc_VARARGS, .doc = Py_convert_to_string__doc__);
-HPyDef_METH(Py_is_sorted_def, "is_sorted", Py_is_sorted, HPyFunc_O, .doc = Py_is_sorted__doc__);
-
-static HPyDef *module_defines[] = {
-    &Py_point_in_path_def,
-    &Py_points_in_path_def,
-    &Py_point_on_path_def,
-    &Py_points_on_path_def,
-    &Py_get_path_extents_def,
-    &Py_update_path_extents_def,
-    &Py_get_path_collection_extents_def,
-    &Py_point_in_path_collection_def,
-    &Py_path_in_path_def,
-    &Py_clip_path_to_rect_def,
-    &Py_affine_transform_def,
-    &Py_count_bboxes_overlapping_bbox_def,
-    &Py_path_intersects_path_def,
-    &Py_path_intersects_rectangle_def,
-    &Py_convert_path_to_polygons_def,
-    &Py_cleanup_path_def,
-    &Py_convert_to_string_def,
-    &Py_is_sorted_def,
-    NULL
-};
-
-static HPyModuleDef moduledef = {
-  .name = "_path_hpy",
-  .doc = NULL,
-  .size = 0,
-  .defines = module_defines,
-};
-
-
 // Logic is from NumPy's import_array()
 static int npy_import_array_hpy(HPyContext *ctx) {
     if (_import_array() < 0) {
@@ -1097,24 +1064,50 @@ static int npy_import_array_hpy(HPyContext *ctx) {
     return 1;
 }
 
+HPyDef_SLOT(_path_hpy_exec, HPy_mod_exec)
+static int _path_hpy_exec_impl(HPyContext *ctx, HPy m)
+{
+    if (!npy_import_array_hpy(ctx)) {
+        return 1;
+    }
+    return 0;
+}
+
+static HPyDef *module_defines[] = {
+    &_path_hpy_exec,
+    &Py_point_in_path,
+    &Py_points_in_path,
+    &Py_point_on_path,
+    &Py_points_on_path,
+    &Py_get_path_extents,
+    &Py_update_path_extents,
+    &Py_get_path_collection_extents,
+    &Py_point_in_path_collection,
+    &Py_path_in_path,
+    &Py_clip_path_to_rect,
+    &Py_affine_transform,
+    &Py_count_bboxes_overlapping_bbox,
+    &Py_path_intersects_path,
+    &Py_path_intersects_rectangle,
+    &Py_convert_path_to_polygons,
+    &Py_cleanup_path,
+    &Py_convert_to_string,
+    &Py_is_sorted,
+    NULL
+};
+
+static HPyModuleDef moduledef = {
+  .doc = NULL,
+  .size = 0,
+  .defines = module_defines,
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #pragma GCC visibility push(default)
-HPy_MODINIT(_path_hpy)
-static HPy init__path_hpy_impl(HPyContext *ctx)
-{
-    if (!npy_import_array_hpy(ctx)) {
-        return HPy_NULL;
-    }
-    HPy m = HPyModule_Create(ctx, &moduledef);
-    if (HPy_IsNull(m)) {
-        return HPy_NULL;
-    }
-
-    return m;
-}
+HPy_MODINIT(_path_hpy, moduledef)
 
 #pragma GCC visibility pop
 #ifdef __cplusplus

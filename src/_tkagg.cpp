@@ -63,7 +63,8 @@ static Tk_PhotoPutBlock_t TK_PHOTO_PUT_BLOCK;
 static Tcl_SetVar_t TCL_SETVAR;
 #endif
 
-static HPy mpl_tk_blit(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(mpl_tk_blit, "blit", HPyFunc_VARARGS)
+static HPy mpl_tk_blit_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_interp = HPy_NULL, h_data_ptr = HPy_NULL;
     Tcl_Interp *interp;
@@ -163,18 +164,15 @@ DpiSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 }
 #endif
 
+HPyDef_METH(mpl_tk_enable_dpi_awareness, "enable_dpi_awareness", HPyFunc_VARARGS)
 static HPy
-mpl_tk_enable_dpi_awareness(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+mpl_tk_enable_dpi_awareness_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     if (nargs != 2) {
-        // return PyErr_Format(PyExc_TypeError,
-        //                     "enable_dpi_awareness() takes 2 positional "
-        //                     "arguments but %zd were given",
-        //                     nargs);
-        HPyErr_SetString(ctx, ctx->h_TypeError,
+        return HPyErr_Format(ctx, ctx->h_TypeError,
                             "enable_dpi_awareness() takes 2 positional "
-                            "arguments");
-        return HPy_NULL;
+                            "arguments but %zd were given",
+                            nargs);
     }
 
 #ifdef WIN32_DLL
@@ -231,14 +229,6 @@ mpl_tk_enable_dpi_awareness(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-HPyDef_METH(mpl_tk_blit_def, "blit", mpl_tk_blit, HPyFunc_VARARGS)
-HPyDef_METH(mpl_tk_enable_dpi_awareness_def, "enable_dpi_awareness", mpl_tk_enable_dpi_awareness, HPyFunc_VARARGS) // TODO HPyFunc_FASTCALL
-
-static HPyDef *module_defines[] = {
-    &mpl_tk_blit_def,
-    &mpl_tk_enable_dpi_awareness_def,
-    NULL
-};
 
 // Functions to fill global Tcl/Tk function pointers by dynamic loading.
 
@@ -308,7 +298,7 @@ void load_tkinter_funcs(HPyContext *ctx)
     // Load tkinter global funcs from tkinter compiled module.
     void *main_program = NULL, *tkinter_lib = NULL;
     HPy module = HPy_NULL, py_path = HPy_NULL, py_path_b = HPy_NULL;
-    char *path;
+    const char *path;
 
     // Try loading from the main program namespace first.
     main_program = dlopen(NULL, RTLD_LAZY);
@@ -353,10 +343,35 @@ exit:
 }
 #endif // end not Windows
 
+HPyDef_SLOT(_tkagg_hpy_exec, HPy_mod_exec)
+static int _tkagg_hpy_exec_impl(HPyContext *ctx, HPy m)
+{
+    load_tkinter_funcs(ctx);
+    if (HPyErr_Occurred(ctx)) {
+        return 1;
+#ifdef WIN32_DLL
+    } else if (!TCL_SETVAR) {
+        HPyErr_SetString(ctx, ctx->h_RuntimeError, "Failed to load Tcl_SetVar");
+        return 1;
+#endif
+    } else if (!TK_FIND_PHOTO) {
+        HPyErr_SetString(ctx, ctx->h_RuntimeError, "Failed to load Tk_FindPhoto");
+        return 1;
+    } else if (!TK_PHOTO_PUT_BLOCK) {
+        HPyErr_SetString(ctx, ctx->h_RuntimeError, "Failed to load Tk_PhotoPutBlock");
+        return 1;
+    }
+    return 0;
+}
+
+static HPyDef *module_defines[] = {
+    &_tkagg_hpy_exec,
+    &mpl_tk_blit,
+    &mpl_tk_enable_dpi_awareness,
+    NULL
+};
+
 static HPyModuleDef moduledef = {
-  .name = "_tkagg_hpy",
-  .doc = "",
-  .size = -1,
   .defines = module_defines,
 };
 
@@ -365,26 +380,8 @@ extern "C" {
 #endif
 
 #pragma GCC visibility push(default)
-HPy_MODINIT(_tkagg_hpy)
-static HPy init__tkagg_hpy_impl(HPyContext *ctx)
-{
-    load_tkinter_funcs(ctx);
-    if (HPyErr_Occurred(ctx)) {
-        return HPy_NULL;
-#ifdef WIN32_DLL
-    } else if (!TCL_SETVAR) {
-        HPyErr_SetString(ctx, ctx->h_RuntimeError, "Failed to load Tcl_SetVar");
-        return HPy_NULL;
-#endif
-    } else if (!TK_FIND_PHOTO) {
-        HPyErr_SetString(ctx, ctx->h_RuntimeError, "Failed to load Tk_FindPhoto");
-        return HPy_NULL;
-    } else if (!TK_PHOTO_PUT_BLOCK) {
-        HPyErr_SetString(ctx, ctx->h_RuntimeError, "Failed to load Tk_PhotoPutBlock");
-        return HPy_NULL;
-    }
-    return HPyModule_Create(ctx, &moduledef);
-}
+
+HPy_MODINIT(_tkagg_hpy, moduledef)
 
 #pragma GCC visibility pop
 #ifdef __cplusplus
