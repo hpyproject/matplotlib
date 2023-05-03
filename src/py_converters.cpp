@@ -492,11 +492,21 @@ int convert_sketch_params_hpy(HPyContext *ctx, HPy obj, void *sketchp)
     if (HPy_IsNull(obj) || HPy_Is(ctx, obj, ctx->h_None)) {
         sketch->scale = 0.0;
     } else {
-        HPy args[] = {obj};
-        int res = HPyArg_Parse(ctx, NULL, args, 1, "(ddd):sketch_params",
+        HPy args[3];
+        HPyTracker ht = HPyTracker_New(ctx, 3);
+        for (HPy_ssize_t i=0; i < 3; i++) {
+            args[i] = HPy_GetItem_i(ctx, obj, i);
+            if (HPy_IsNull(args[i])) {
+                HPyTracker_Close(ctx, ht);
+                return 0;
+            }
+            HPyTracker_Add(ctx, ht, args[i]);
+        }
+        int res = HPyArg_Parse(ctx, NULL, args, 3, "ddd:sketch_params",
                                  &sketch->scale,
                                  &sketch->length,
                                  &sketch->randomness);
+        HPyTracker_Close(ctx, ht);
         if (!res) {
             return 0;
         }
