@@ -8,13 +8,14 @@
 #include "_image_resample.h"
 #include "numpy_cpp.h"
 #include "py_converters.h"
+#include "hpy_utils.h"
 
 
 /**********************************************************************
  * Free functions
  * */
 
-const char* image_resample__doc__ =
+static const char image_resample__doc__[] =
 "resample(input_array, output_array, matrix, interpolation=NEAREST, alpha=1.0, norm=False, radius=1)\n\n"
 
 "Resample input_array, blending it in-place into output_array, using an\n"
@@ -56,27 +57,6 @@ const char* image_resample__doc__ =
 "    The radius of the kernel, if method is SINC, LANCZOS or BLACKMAN.\n"
 "    Default is 1.\n";
 
-static HPy HPyCall(HPyContext *ctx, HPy obj, const char *func_name, HPy argtuple, HPy kwds) {
-    if (!HPy_HasAttr_s(ctx, obj, func_name)) {
-        return HPy_NULL;
-    }
-    HPy func = HPy_GetAttr_s(ctx, obj, func_name);
-    if (HPy_IsNull(func)) {
-        return HPy_NULL;
-    }
-    if (!HPyCallable_Check(ctx, func)) {
-        HPy_Close(ctx, func);
-        return HPy_NULL;
-    }
-    HPy result = HPy_CallTupleDict(ctx, func, argtuple, kwds);
-    if (HPy_IsNull(result)) {
-        HPy_Close(ctx, func);
-        return HPy_NULL;
-    }
-    HPy_Close(ctx, func);
-    return result;
-}
-
 static PyArrayObject *
 _get_transform_mesh(HPyContext *ctx, HPy py_affine, npy_intp *dims)
 {
@@ -91,10 +71,8 @@ _get_transform_mesh(HPyContext *ctx, HPy py_affine, npy_intp *dims)
     out_dims[0] = dims[0] * dims[1];
     out_dims[1] = 2;
 
-    // HPy tuple[] = {py_affine};
-    // HPy argtuple = HPyTuple_FromArray(ctx, tuple, 1);
-    HPy py_inverse = HPyCall(ctx, py_affine, "inverted", HPy_NULL, HPy_NULL);
-    // HPy_Close(ctx, argtuple);
+    const HPy args[] = {py_affine};
+    HPy py_inverse = HPy_CallMethod_s(ctx, "inverted", args, 0, HPy_NULL);
     if (HPy_IsNull(py_inverse)) {
         return NULL;
     }
@@ -110,12 +88,10 @@ _get_transform_mesh(HPyContext *ctx, HPy py_affine, npy_intp *dims)
     }
 
     HPy h_val = HPy_FromPyObject(ctx, input_mesh.pyobj_steal());
-    HPy tuple_transform[] = {h_val};
-    HPy argtuple_transform = HPyTuple_FromArray(ctx, tuple_transform, 1);
-    HPy output_mesh = HPyCall(ctx, py_inverse, "transform", argtuple_transform, HPy_NULL);
-    HPy_Close(ctx, h_val);
-    HPy_Close(ctx, argtuple_transform);
+    const HPy transform_args[] = {py_inverse, h_val};
+    HPy output_mesh = HPy_CallMethod_s(ctx, "transform", transform_args, 2, HPy_NULL);
 
+    HPy_Close(ctx, h_val);
     HPy_Close(ctx, py_inverse);
 
     if (HPy_IsNull(output_mesh)) {
@@ -149,8 +125,9 @@ resample(HPyContext *ctx, PyArrayObject* input, PyArrayObject* output, resample_
 }
 
 
+HPyDef_METH(image_resample, "resample", HPyFunc_KEYWORDS, .doc=image_resample__doc__)
 static HPy
-image_resample(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwargs)
+image_resample_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs, HPy kwnames)
 {
     HPy py_input_array = HPy_NULL;
     HPy py_output_array = HPy_NULL;
@@ -176,7 +153,7 @@ image_resample(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kw
 
     HPyTracker ht;
     if (!HPyArg_ParseKeywords(ctx, &ht, args, nargs,
-            kwargs, 
+            kwnames,
             "OOO|iOdOd:resample", 
             (const char **)kwlist,
             &py_input_array, 
@@ -196,9 +173,8 @@ image_resample(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kw
     }
 
     if (params.interpolation < 0 || params.interpolation >= _n_interpolation) {
-        // PyErr_Format(PyExc_ValueError, "invalid interpolation value %d",
-        //              params.interpolation);
-        HPyErr_SetString(ctx, ctx->h_ValueError, "invalid interpolation value");
+        HPyErr_Format(ctx, ctx->h_ValueError, "invalid interpolation value %d",
+                     params.interpolation);
         goto error;
     }
 
@@ -253,12 +229,9 @@ image_resample(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kw
     }
 
     if (PyArray_NDIM(input_array) != PyArray_NDIM(output_array)) {
-        // PyErr_Format(
-        //     PyExc_ValueError,
-        //     "Mismatched number of dimensions. Got %d and %d.",
-        //     PyArray_NDIM(input_array), PyArray_NDIM(output_array));
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-            "Mismatched number of dimensions.");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+            "Mismatched number of dimensions. Got %d and %d.",
+            PyArray_NDIM(input_array), PyArray_NDIM(output_array));
         goto error;
     }
 
@@ -297,12 +270,9 @@ image_resample(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kw
                 goto error;
             }
         } else {
-            // PyErr_Format(
-            //     PyExc_ValueError,
-            //     "If 3-dimensional, array must be RGBA.  Got %" NPY_INTP_FMT " planes.",
-            //     PyArray_DIM(input_array, 2));
-            HPyErr_SetString(ctx, ctx->h_ValueError,
-                "If 3-dimensional, array must be RGBA.");
+            HPyErr_Format(ctx, ctx->h_ValueError,
+                "If 3-dimensional, array must be RGBA.  Got %" NPY_INTP_FMT " planes.",
+                PyArray_DIM(input_array, 2));
             goto error;
         }
     } else { // NDIM == 2
@@ -339,19 +309,6 @@ image_resample(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kw
     return HPy_NULL;
 }
 
-HPyDef_METH(image_resample_def, "resample", image_resample, HPyFunc_KEYWORDS, .doc =image_resample__doc__)
-
-static HPyDef *module_defines[] = {
-    &image_resample_def,
-    NULL
-};
-
-static HPyModuleDef moduledef = {
-    .name = "_image_hpy",
-    .doc = NULL,
-    .size = 0,
-    .defines = module_defines,
-};
 
 int add_dict_int(HPyContext *ctx, HPy dict, const char *key, long val)
 {
@@ -380,22 +337,11 @@ static int npy_import_array_hpy(HPyContext *ctx) {
     return 1;
 }
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#pragma GCC visibility push(default)
-
-HPy_MODINIT(_image_hpy)
-static HPy init__image_hpy_impl(HPyContext *ctx)
+HPyDef_SLOT(_image_hpy_exec, HPy_mod_exec)
+static int _image_hpy_exec_impl(HPyContext *ctx, HPy m)
 {
     if (!npy_import_array_hpy(ctx)) {
-        return HPy_NULL;
-    }
-
-    HPy m = HPyModule_Create(ctx, &moduledef);
-    if (HPy_IsNull(m)) {
-        return HPy_NULL;
+        return 1;
     }
 
     if (add_dict_int(ctx, m, "NEAREST", NEAREST) ||
@@ -416,12 +362,32 @@ static HPy init__image_hpy_impl(HPyContext *ctx)
         add_dict_int(ctx, m, "LANCZOS", LANCZOS) ||
         add_dict_int(ctx, m, "BLACKMAN", BLACKMAN) ||
         add_dict_int(ctx, m, "_n_interpolation", _n_interpolation)) {
-        return HPy_NULL;
+        return 1;
 
     }
 
-    return m;
+    return 0;
 }
+
+static HPyDef *module_defines[] = {
+    &_image_hpy_exec,
+    &image_resample,
+    NULL
+};
+
+static HPyModuleDef moduledef = {
+    .doc = NULL,
+    .size = 0,
+    .defines = module_defines,
+};
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#pragma GCC visibility push(default)
+
+HPy_MODINIT(_image_hpy, moduledef)
 
 #pragma GCC visibility pop
 

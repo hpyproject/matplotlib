@@ -9,6 +9,7 @@
 #include "py_converters.h"
 #include "_backend_agg.h"
 #include "hpy.h"
+#include "hpy_utils.h"
 
 typedef struct
 {
@@ -20,7 +21,7 @@ typedef struct
 
 HPyType_HELPERS(PyRendererAgg)
 
-static HPy h_PyRendererAggType;
+static HPyGlobal PyRendererAggType;
 
 typedef struct
 {
@@ -32,70 +33,79 @@ typedef struct
 
 HPyType_HELPERS(PyBufferRegion)
 
-static HPy h_PyBufferRegionType;
+static HPyGlobal PyBufferRegionType;
 /**********************************************************************
  * BufferRegion
  * */
 
-static HPy PyBufferRegion_new(HPyContext *ctx, HPy type, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_SLOT(PyBufferRegion_new, HPy_tp_new)
+static HPy PyBufferRegion_new_impl(HPyContext *ctx, HPy type, const HPy *args, HPy_ssize_t nargs, HPy kwds)
 {
     PyBufferRegion *self;
     HPy h_self = HPy_New(ctx, type, &self);
-    self->x = NULL;
+    if (HPy_IsNull(h_self))
+        return HPy_NULL;
+    assert(self->x == NULL);
     return h_self;
 }
 
-static void PyBufferRegion_dealloc(void *obj)
+HPyDef_SLOT(PyBufferRegion_dealloc, HPy_tp_destroy)
+static void PyBufferRegion_dealloc_impl(void *obj)
 {
     PyBufferRegion* self = (PyBufferRegion*)obj;
     delete self->x;
     //Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-static HPy PyBufferRegion_to_string(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyBufferRegion_to_string, "to_string", HPyFunc_NOARGS)
+static HPy PyBufferRegion_to_string_impl(HPyContext *ctx, HPy h_self)
 {
-    PyBufferRegion* self = (PyBufferRegion*)HPy_AsStruct(ctx, h_self);
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
     return HPyBytes_FromStringAndSize(ctx, (const char *)self->x->get_data(),
                                      self->x->get_height() * self->x->get_stride());
 }
 
 /* TODO: This doesn't seem to be used internally.  Remove? */
 
-static HPy PyBufferRegion_set_x(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyBufferRegion_set_x, "set_x", HPyFunc_VARARGS)
+static HPy PyBufferRegion_set_x_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     int x;
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "i:set_x", &x)) {
         return HPy_NULL;
     }
-    PyBufferRegion* self = (PyBufferRegion*)HPy_AsStruct(ctx, h_self);
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
     self->x->get_rect().x1 = x;
 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-static HPy PyBufferRegion_set_y(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyBufferRegion_set_y, "set_y", HPyFunc_VARARGS)
+static HPy PyBufferRegion_set_y_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     int y;
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "i:set_y", &y)) {
         return HPy_NULL;
     }
-    PyBufferRegion* self = (PyBufferRegion*)HPy_AsStruct(ctx, h_self);
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
     self->x->get_rect().y1 = y;
 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-static HPy PyBufferRegion_get_extents(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyBufferRegion_get_extents, "get_extents", HPyFunc_NOARGS)
+static HPy PyBufferRegion_get_extents_impl(HPyContext *ctx, HPy h_self)
 {
-    PyBufferRegion* self = (PyBufferRegion*)HPy_AsStruct(ctx, h_self);
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
     agg::rect_i rect = self->x->get_rect();
 
     return HPy_BuildValue(ctx, "IIII", rect.x1, rect.y1, rect.x2, rect.y2);
 }
 
-static HPy PyBufferRegion_to_string_argb(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyBufferRegion_to_string_argb, "to_string_argb", HPyFunc_NOARGS)
+static HPy PyBufferRegion_to_string_argb_impl(HPyContext *ctx, HPy h_self)
 {
-    PyBufferRegion* self = (PyBufferRegion*)HPy_AsStruct(ctx, h_self);
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
     HPy bufobj = HPyBytes_FromStringAndSize(ctx, NULL, self->x->get_height() * self->x->get_stride());
     uint8_t *buf = (uint8_t *)HPyBytes_AS_STRING(ctx, bufobj);
 
@@ -104,10 +114,11 @@ static HPy PyBufferRegion_to_string_argb(HPyContext *ctx, HPy h_self)
     return bufobj;
 }
 
-static int PyBufferRegion_get_buffer(HPyContext *ctx, HPy h_self, HPy_buffer* buf, int flags)
+HPyDef_SLOT(PyBufferRegion_get_buffer, HPy_bf_getbuffer)
+static int PyBufferRegion_get_buffer_impl(HPyContext *ctx, HPy h_self, HPy_buffer *buf, int flags)
 {
     HPy_Dup(ctx, h_self);
-    PyBufferRegion* self = (PyBufferRegion*)HPy_AsStruct(ctx, h_self);
+    PyBufferRegion* self = PyBufferRegion_AsStruct(ctx, h_self);
     buf->obj = h_self;
     buf->buf = self->x->get_data();
     buf->len = (HPy_ssize_t)self->x->get_width() * (HPy_ssize_t)self->x->get_height() * 4;
@@ -129,32 +140,22 @@ static int PyBufferRegion_get_buffer(HPyContext *ctx, HPy h_self, HPy_buffer* bu
     return 1;
 }
 
-HPyDef_SLOT(PyBufferRegion_new_def, PyBufferRegion_new, HPy_tp_new)
-HPyDef_SLOT(PyBufferRegion_get_buffer_def, PyBufferRegion_get_buffer, HPy_bf_getbuffer)
-HPyDef_SLOT(PyBufferRegion_dealloc_def, PyBufferRegion_dealloc, HPy_tp_destroy)
-
-HPyDef_METH(PyBufferRegion_to_string_def, "to_string", PyBufferRegion_to_string, HPyFunc_NOARGS)
-HPyDef_METH(PyBufferRegion_to_string_argb_def, "to_string_argb", PyBufferRegion_to_string_argb, HPyFunc_NOARGS)
-HPyDef_METH(PyBufferRegion_set_x_def, "set_x", PyBufferRegion_set_x, HPyFunc_VARARGS)
-HPyDef_METH(PyBufferRegion_set_y_def, "set_y", PyBufferRegion_set_y, HPyFunc_VARARGS)
-HPyDef_METH(PyBufferRegion_get_extents_def, "get_extents", PyBufferRegion_get_extents, HPyFunc_NOARGS)
-
-HPyDef *PyBufferRegion_defines[] = {
+static HPyDef *PyBufferRegion_defines[] = {
     // slots
-    &PyBufferRegion_new_def,
-    &PyBufferRegion_get_buffer_def,
-    &PyBufferRegion_dealloc_def,
+    &PyBufferRegion_new,
+    &PyBufferRegion_get_buffer,
+    &PyBufferRegion_dealloc,
 
     // methods
-    &PyBufferRegion_to_string_def,
-    &PyBufferRegion_to_string_argb_def,
-    &PyBufferRegion_set_x_def,
-    &PyBufferRegion_set_y_def,
-    &PyBufferRegion_get_extents_def,
+    &PyBufferRegion_to_string,
+    &PyBufferRegion_to_string_argb,
+    &PyBufferRegion_set_x,
+    &PyBufferRegion_set_y,
+    &PyBufferRegion_get_extents,
     NULL
 };
 
-HPyType_Spec PyBufferRegion_type_spec = {
+static HPyType_Spec PyBufferRegion_type_spec = {
     .name = "matplotlib.backends._backend_agg.BufferRegion",
     .basicsize = sizeof(PyBufferRegion),
     .flags = HPy_TPFLAGS_DEFAULT | HPy_TPFLAGS_BASETYPE,
@@ -166,7 +167,8 @@ HPyType_Spec PyBufferRegion_type_spec = {
  * RendererAgg
  * */
 
-static HPy PyRendererAgg_new(HPyContext *ctx, HPy type, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_SLOT(PyRendererAgg_new, HPy_tp_new)
+static HPy PyRendererAgg_new_impl(HPyContext *ctx, HPy type, const HPy *args, HPy_ssize_t nargs, HPy kwds)
 {
     PyRendererAgg *self;
     HPy h_self = HPy_New(ctx, type, &self);
@@ -174,7 +176,8 @@ static HPy PyRendererAgg_new(HPyContext *ctx, HPy type, HPy* args, HPy_ssize_t n
     return h_self;
 }
 
-static int PyRendererAgg_init(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs, HPy kwds)
+HPyDef_SLOT(PyRendererAgg_init, HPy_tp_init)
+static int PyRendererAgg_init_impl(HPyContext *ctx, HPy h_self, const HPy *args, HPy_ssize_t nargs, HPy kwds)
 {
     unsigned int width;
     unsigned int height;
@@ -191,33 +194,31 @@ static int PyRendererAgg_init(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_
     }
 
     if (width >= 1 << 16 || height >= 1 << 16) {
-        // PyErr_Format(
-        //     PyExc_ValueError,
-        //     "Image size of %dx%d pixels is too large. "
-        //     "It must be less than 2^16 in each direction.",
-        //     width, height);
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-            "Image size is too large. "
-            "It must be less than 2^16 in each direction.");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+                "Image size of %dx%d pixels is too large. "
+                "It must be less than 2^16 in each direction.",
+                width, height);
         return -1;
     }
 
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     CALL_CPP_INIT_HPY(ctx, "RendererAgg", self->x = new RendererAgg(width, height, dpi))
 
     return 0;
 }
 
-static void PyRendererAgg_dealloc(void *obj)
+HPyDef_SLOT(PyRendererAgg_dealloc, HPy_tp_destroy)
+static void PyRendererAgg_dealloc_impl(void *obj)
 {
     PyRendererAgg* self = (PyRendererAgg*)obj;
     delete self->x;
     //Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-static HPy PyRendererAgg_draw_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyRendererAgg_draw_path, "draw_path", HPyFunc_VARARGS)
+static HPy PyRendererAgg_draw_path_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     HPy h_gc = HPy_NULL;
     HPy h_path = HPy_NULL;
     HPy h_trans = HPy_NULL;
@@ -249,7 +250,8 @@ static HPy PyRendererAgg_draw_path(HPyContext *ctx, HPy h_self, HPy* args, HPy_s
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-static HPy PyRendererAgg_draw_text_image(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyRendererAgg_draw_text_image, "draw_text_image", HPyFunc_VARARGS)
+static HPy PyRendererAgg_draw_text_image_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_image = HPy_NULL;
     HPy h_gc = HPy_NULL;
@@ -275,13 +277,14 @@ static HPy PyRendererAgg_draw_text_image(HPyContext *ctx, HPy h_self, HPy* args,
         return HPy_NULL;
     }
 
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     CALL_CPP_HPY(ctx, "draw_text_image", (self->x->draw_text_image(gc, image, x, y, angle)));
 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-static HPy PyRendererAgg_draw_markers(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyRendererAgg_draw_markers, "draw_markers", HPyFunc_VARARGS)
+static HPy PyRendererAgg_draw_markers_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_gc = HPy_NULL;
     HPy h_marker_path = HPy_NULL;
@@ -317,14 +320,15 @@ static HPy PyRendererAgg_draw_markers(HPyContext *ctx, HPy h_self, HPy* args, HP
         return HPy_NULL;
     }
 
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     CALL_CPP_HPY(ctx, "draw_markers",
              (self->x->draw_markers(gc, marker_path, marker_path_trans, path, trans, face)));
 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-static HPy PyRendererAgg_draw_image(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyRendererAgg_draw_image, "draw_image", HPyFunc_VARARGS)
+static HPy PyRendererAgg_draw_image_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_gc = HPy_NULL;
     HPy h_image = HPy_NULL;
@@ -352,14 +356,15 @@ static HPy PyRendererAgg_draw_image(HPyContext *ctx, HPy h_self, HPy* args, HPy_
     y = mpl_round(y);
 
     gc.alpha = 1.0;
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     CALL_CPP_HPY(ctx, "draw_image", (self->x->draw_image(gc, x, y, image)));
 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
+HPyDef_METH(PyRendererAgg_draw_path_collection, "draw_path_collection", HPyFunc_VARARGS)
 static HPy 
-PyRendererAgg_draw_path_collection(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+PyRendererAgg_draw_path_collection_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_gc = HPy_NULL;
     HPy h_master_transform = HPy_NULL;
@@ -419,7 +424,7 @@ PyRendererAgg_draw_path_collection(HPyContext *ctx, HPy h_self, HPy* args, HPy_s
         return HPy_NULL;
     }
 
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     CALL_CPP_HPY(ctx, "draw_path_collection",
              (self->x->draw_path_collection(gc,
                                             master_transform,
@@ -436,7 +441,8 @@ PyRendererAgg_draw_path_collection(HPyContext *ctx, HPy h_self, HPy* args, HPy_s
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-static HPy PyRendererAgg_draw_quad_mesh(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyRendererAgg_draw_quad_mesh, "draw_quad_mesh", HPyFunc_VARARGS)
+static HPy PyRendererAgg_draw_quad_mesh_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_gc = HPy_NULL;
     HPy h_master_transform = HPy_NULL;
@@ -484,7 +490,7 @@ static HPy PyRendererAgg_draw_quad_mesh(HPyContext *ctx, HPy h_self, HPy* args, 
         return HPy_NULL;
     }
 
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     CALL_CPP_HPY(ctx, "draw_quad_mesh",
              (self->x->draw_quad_mesh(gc,
                                       master_transform,
@@ -500,8 +506,9 @@ static HPy PyRendererAgg_draw_quad_mesh(HPyContext *ctx, HPy h_self, HPy* args, 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
+HPyDef_METH(PyRendererAgg_draw_gouraud_triangle, "draw_gouraud_triangle", HPyFunc_VARARGS)
 static HPy 
-PyRendererAgg_draw_gouraud_triangle(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+PyRendererAgg_draw_gouraud_triangle_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_gc = HPy_NULL;
     HPy h_points = HPy_NULL;
@@ -530,32 +537,29 @@ PyRendererAgg_draw_gouraud_triangle(HPyContext *ctx, HPy h_self, HPy* args, HPy_
     }
 
     if (points.dim(0) != 3 || points.dim(1) != 2) {
-        // PyErr_Format(PyExc_ValueError,
-        //              "points must be a 3x2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-        //              points.dim(0), points.dim(1)); TODO: HPyErr_Format
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-                     "points must be a 3x2 array");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+                "points must be a 3x2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+                points.dim(0), points.dim(1));
         return HPy_NULL;
     }
 
     if (colors.dim(0) != 3 || colors.dim(1) != 4) {
-        // PyErr_Format(PyExc_ValueError,
-        //              "colors must be a 3x4 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-        //              colors.dim(0), colors.dim(1)); TODO: HPyErr_Format
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-                     "colors must be a 3x4 array");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+                     "colors must be a 3x4 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+                     colors.dim(0), colors.dim(1));
         return HPy_NULL;
     }
 
 
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     CALL_CPP_HPY(ctx, "draw_gouraud_triangle", (self->x->draw_gouraud_triangle(gc, points, colors, trans)));
 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
+HPyDef_METH(PyRendererAgg_draw_gouraud_triangles, "draw_gouraud_triangles", HPyFunc_VARARGS)
 static HPy 
-PyRendererAgg_draw_gouraud_triangles(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+PyRendererAgg_draw_gouraud_triangles_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_gc = HPy_NULL;
     HPy h_points = HPy_NULL;
@@ -584,43 +588,37 @@ PyRendererAgg_draw_gouraud_triangles(HPyContext *ctx, HPy h_self, HPy* args, HPy
     }
 
     if (points.size() != 0 && (points.dim(1) != 3 || points.dim(2) != 2)) {
-        // PyErr_Format(PyExc_ValueError,
-        //              "points must be a Nx3x2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-        //              points.dim(0), points.dim(1), points.dim(2));
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-                     "points must be a Nx3x2 array");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+                     "points must be a Nx3x2 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+                     points.dim(0), points.dim(1), points.dim(2));
         return HPy_NULL;
     }
 
     if (colors.size() != 0 && (colors.dim(1) != 3 || colors.dim(2) != 4)) {
-        // PyErr_Format(PyExc_ValueError,
-        //              "colors must be a Nx3x4 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
-        //              colors.dim(0), colors.dim(1), colors.dim(2));
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-                     "colors must be a Nx3x4 array");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+                     "colors must be a Nx3x4 array, got %" NPY_INTP_FMT "x%" NPY_INTP_FMT "x%" NPY_INTP_FMT,
+                     colors.dim(0), colors.dim(1), colors.dim(2));
         return HPy_NULL;
     }
 
     if (points.size() != colors.size()) {
-        // PyErr_Format(PyExc_ValueError,
-        //              "points and colors arrays must be the same length, got %" NPY_INTP_FMT " and %" NPY_INTP_FMT,
-        //              points.dim(0), colors.dim(0));
-        HPyErr_SetString(ctx, ctx->h_ValueError,
-                     "points and colors arrays must be the same length");
+        HPyErr_Format(ctx, ctx->h_ValueError,
+                     "points and colors arrays must be the same length, got %" NPY_INTP_FMT " and %" NPY_INTP_FMT,
+                     points.dim(0), colors.dim(0));
         return HPy_NULL;
     }
 
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     CALL_CPP_HPY(ctx, "draw_gouraud_triangles", self->x->draw_gouraud_triangles(gc, points, colors, trans));
 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-static int PyRendererAgg_get_buffer(HPyContext *ctx, HPy h_self, HPy_buffer* buf, int flags)
+HPyDef_SLOT(PyRendererAgg_get_buffer, HPy_bf_getbuffer)
+static int PyRendererAgg_get_buffer_impl(HPyContext *ctx, HPy h_self, HPy_buffer *buf, int flags)
 {
-    HPy_Dup(ctx, h_self);
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
-    buf->obj = h_self;
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    buf->obj = HPy_Dup(ctx, h_self);
     buf->buf = self->x->pixBuffer;
     buf->len = (HPy_ssize_t)self->x->get_width() * (HPy_ssize_t)self->x->get_height() * 4;
     buf->readonly = 0;
@@ -641,24 +639,26 @@ static int PyRendererAgg_get_buffer(HPyContext *ctx, HPy h_self, HPy_buffer* buf
     return 1;
 }
 
-static HPy PyRendererAgg_clear(HPyContext *ctx, HPy h_self)
+HPyDef_METH(PyRendererAgg_clear, "clear", HPyFunc_NOARGS)
+static HPy PyRendererAgg_clear_impl(HPyContext *ctx, HPy h_self)
 {
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     CALL_CPP_HPY(ctx, "clear", self->x->clear());
 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-static HPy PyRendererAgg_copy_from_bbox(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyRendererAgg_copy_from_bbox, "copy_from_bbox", HPyFunc_VARARGS)
+static HPy PyRendererAgg_copy_from_bbox_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
     agg::rect_d bbox;
     BufferRegion *reg;
     HPy h_regobj;
     HPy h_bbox = HPy_NULL;
 
     if (!HPyArg_Parse(ctx, NULL, args, nargs, "O:copy_from_bbox", &h_bbox)) {
-                return HPy_NULL;
+        return HPy_NULL;
     }
 
     if (!convert_rect_hpy(ctx, h_bbox, &bbox)) {
@@ -669,14 +669,19 @@ static HPy PyRendererAgg_copy_from_bbox(HPyContext *ctx, HPy h_self, HPy* args, 
 
     CALL_CPP_HPY(ctx, "copy_from_bbox", (reg = self->x->copy_from_bbox(bbox)));
 
-    h_regobj = PyBufferRegion_new(ctx, h_PyBufferRegionType, NULL, 0, HPy_NULL);
-    PyBufferRegion* regobj = (PyBufferRegion*)HPy_AsStruct(ctx, h_regobj);
+    HPy h_PyBufferRegionType = HPyGlobal_Load(ctx, PyBufferRegionType);
+    h_regobj = PyBufferRegion_new_impl(ctx, h_PyBufferRegionType, NULL, 0, HPy_NULL);
+    HPy_Close(ctx, h_PyBufferRegionType);
+    if (HPy_IsNull(h_regobj))
+        return HPy_NULL;
+    PyBufferRegion* regobj = PyBufferRegion_AsStruct(ctx, h_regobj);
     regobj->x = reg;
 
     return h_regobj;
 }
 
-static HPy PyRendererAgg_restore_region(HPyContext *ctx, HPy h_self, HPy* args, HPy_ssize_t nargs)
+HPyDef_METH(PyRendererAgg_restore_region, "restore_region", HPyFunc_VARARGS)
+static HPy PyRendererAgg_restore_region_impl(HPyContext *ctx, HPy h_self, const HPy *args, size_t nargs)
 {
     HPy h_regobj;
     int xx1 = 0, yy1 = 0, xx2 = 0, yy2 = 0, x = 0, y = 0;
@@ -693,13 +698,13 @@ static HPy PyRendererAgg_restore_region(HPyContext *ctx, HPy h_self, HPy* args, 
         return HPy_NULL;
     }
 
-    if (!HPy_TypeCheck(ctx, h_regobj, h_PyBufferRegionType)) {
+    if (!HPy_TypeCheck_g(ctx, h_regobj, PyBufferRegionType)) {
         HPyErr_SetString(ctx, ctx->h_TypeError, "arg must be BufferRegion"); // TODO
         return HPy_NULL;
     }
 
-    PyRendererAgg* self = (PyRendererAgg*)HPy_AsStruct(ctx, h_self);
-    PyBufferRegion* regobj = (PyBufferRegion*)HPy_AsStruct(ctx, h_regobj);
+    PyRendererAgg* self = PyRendererAgg_AsStruct(ctx, h_self);
+    PyBufferRegion* regobj = PyBufferRegion_AsStruct(ctx, h_regobj);
     if (nargs == 1) {
         CALL_CPP_HPY(ctx, "restore_region", self->x->restore_region(*(regobj->x)));
     } else {
@@ -709,57 +714,35 @@ static HPy PyRendererAgg_restore_region(HPyContext *ctx, HPy h_self, HPy* args, 
     return HPy_Dup(ctx, ctx->h_None);
 }
 
-HPyDef_SLOT(PyRendererAgg_new_def, PyRendererAgg_new, HPy_tp_new)
-HPyDef_SLOT(PyRendererAgg_init_def, PyRendererAgg_init, HPy_tp_init)
-HPyDef_SLOT(PyRendererAgg_get_buffer_def, PyRendererAgg_get_buffer, HPy_bf_getbuffer)
-HPyDef_SLOT(PyRendererAgg_dealloc_def, PyRendererAgg_dealloc, HPy_tp_destroy)
-
-HPyDef_METH(PyRendererAgg_draw_path_def, "draw_path", PyRendererAgg_draw_path, HPyFunc_VARARGS)
-HPyDef_METH(PyRendererAgg_draw_markers_def, "draw_markers", PyRendererAgg_draw_markers, HPyFunc_VARARGS)
-HPyDef_METH(PyRendererAgg_draw_text_image_def, "draw_text_image", PyRendererAgg_draw_text_image, HPyFunc_VARARGS)
-HPyDef_METH(PyRendererAgg_draw_image_def, "draw_image", PyRendererAgg_draw_image, HPyFunc_VARARGS)
-HPyDef_METH(PyRendererAgg_draw_path_collection_def, "draw_path_collection", PyRendererAgg_draw_path_collection, HPyFunc_VARARGS)
-HPyDef_METH(PyRendererAgg_draw_quad_mesh_def, "draw_quad_mesh", PyRendererAgg_draw_quad_mesh, HPyFunc_VARARGS)
-HPyDef_METH(PyRendererAgg_draw_gouraud_triangle_def, "draw_gouraud_triangle", PyRendererAgg_draw_gouraud_triangle, HPyFunc_VARARGS)
-HPyDef_METH(PyRendererAgg_draw_gouraud_triangles_def, "draw_gouraud_triangles", PyRendererAgg_draw_gouraud_triangles, HPyFunc_VARARGS)
-HPyDef_METH(PyRendererAgg_clear_def, "clear", PyRendererAgg_clear, HPyFunc_NOARGS)
-HPyDef_METH(PyRendererAgg_copy_from_bbox_def, "copy_from_bbox", PyRendererAgg_copy_from_bbox, HPyFunc_VARARGS)
-HPyDef_METH(PyRendererAgg_restore_region_def, "restore_region", PyRendererAgg_restore_region, HPyFunc_VARARGS)
 
 
-HPyDef *PyRendererAgg_defines[] = {
+static HPyDef *PyRendererAgg_defines[] = {
     // slots
-    &PyRendererAgg_new_def,
-    &PyRendererAgg_init_def,
-    &PyRendererAgg_get_buffer_def,
-    &PyRendererAgg_dealloc_def,
+    &PyRendererAgg_new,
+    &PyRendererAgg_init,
+    &PyRendererAgg_get_buffer,
+    &PyRendererAgg_dealloc,
     
     // methods
-    &PyRendererAgg_draw_path_def,
-    &PyRendererAgg_draw_markers_def,
-    &PyRendererAgg_draw_text_image_def,
-    &PyRendererAgg_draw_image_def,
-    &PyRendererAgg_draw_path_collection_def,
-    &PyRendererAgg_draw_quad_mesh_def,
-    &PyRendererAgg_draw_gouraud_triangle_def,
-    &PyRendererAgg_draw_gouraud_triangles_def,
-    &PyRendererAgg_clear_def,
-    &PyRendererAgg_copy_from_bbox_def,
-    &PyRendererAgg_restore_region_def,
+    &PyRendererAgg_draw_path,
+    &PyRendererAgg_draw_markers,
+    &PyRendererAgg_draw_text_image,
+    &PyRendererAgg_draw_image,
+    &PyRendererAgg_draw_path_collection,
+    &PyRendererAgg_draw_quad_mesh,
+    &PyRendererAgg_draw_gouraud_triangle,
+    &PyRendererAgg_draw_gouraud_triangles,
+    &PyRendererAgg_clear,
+    &PyRendererAgg_copy_from_bbox,
+    &PyRendererAgg_restore_region,
     NULL
 };
 
-HPyType_Spec PyRendererAgg_type_spec = {
+static HPyType_Spec PyRendererAgg_type_spec = {
     .name = "matplotlib.backends._backend_agg.RendererAgg",
     .basicsize = sizeof(PyRendererAgg),
     .flags = HPy_TPFLAGS_DEFAULT | HPy_TPFLAGS_BASETYPE,
     .defines = PyRendererAgg_defines,
-};
-
-static HPyModuleDef moduledef = {
-    .name = "_backend_agg_hpy",
-    .doc = NULL,
-    .size = 0,
 };
 
 // Logic is from NumPy's import_array()
@@ -772,39 +755,57 @@ static int npy_import_array_hpy(HPyContext *ctx) {
     return 1;
 }
 
+HPyDef_SLOT(_backend_agg_hpy_exec, HPy_mod_exec)
+static int _backend_agg_hpy_exec_impl(HPyContext *ctx, HPy m)
+{
+    HPy tmp;
+
+    if (!npy_import_array_hpy(ctx)) {
+        return 1;
+    }
+
+    if (!HPyHelpers_AddType(ctx, m, "RendererAgg", &PyRendererAgg_type_spec, NULL)) {
+        return 1;
+    }
+
+    tmp = HPy_GetAttr_s(ctx, m, "RendererAgg");
+    HPyGlobal_Store(ctx, &PyRendererAggType, tmp);
+    HPy_Close(ctx, tmp);
+
+    if (!HPyHelpers_AddType(ctx, m, "BufferRegion", &PyBufferRegion_type_spec, NULL)) {
+        return 1;
+    }
+
+    tmp = HPy_GetAttr_s(ctx, m, "BufferRegion");
+    HPyGlobal_Store(ctx, &PyBufferRegionType, tmp);
+    HPy_Close(ctx, tmp);
+
+    return 0;
+}
+
+static HPyDef *module_defines[] = {
+    &_backend_agg_hpy_exec,
+    NULL
+};
+
+static HPyGlobal *module_globals[] = {
+    &PyRendererAggType,
+    &PyBufferRegionType,
+    NULL
+};
+
+static HPyModuleDef moduledef = {
+    .defines = module_defines,
+    .globals = module_globals,
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #pragma GCC visibility push(default)
 
-HPy_MODINIT(_backend_agg_hpy)
-static HPy init__backend_agg_hpy_impl(HPyContext *ctx)
-{
-    if (!npy_import_array_hpy(ctx)) {
-        return HPy_NULL;
-    }
-    HPy m = HPyModule_Create(ctx, &moduledef);
-    if (HPy_IsNull(m)) {
-        return HPy_NULL;
-    }
-
-    if (!HPyHelpers_AddType(ctx, m, "RendererAgg", &PyRendererAgg_type_spec, NULL)) {
-        HPy_Close(ctx, m);
-        return HPy_NULL;
-    }
-
-    h_PyRendererAggType = HPy_GetAttr_s(ctx, m, "RendererAgg");
-
-    if (!HPyHelpers_AddType(ctx, m, "BufferRegion", &PyBufferRegion_type_spec, NULL)) {
-        HPy_Close(ctx, m);
-        return HPy_NULL;
-    }
-
-    h_PyBufferRegionType = HPy_GetAttr_s(ctx, m, "BufferRegion");
-
-    return m;
-}
+HPy_MODINIT(_backend_agg_hpy, moduledef)
 
 #pragma GCC visibility pop
 

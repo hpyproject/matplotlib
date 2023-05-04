@@ -42,8 +42,7 @@ class exception : public std::exception
     }                                                                        \
     catch (const std::bad_alloc &)                                           \
     {                                                                        \
-        /* HPyErr_Format(ctx, ctx->h_MemoryError, "In %s: Out of memory", (name)); */ \
-        HPyErr_SetString(ctx, ctx->h_MemoryError, "In XX Out of memory");     \
+        HPyErr_Format(ctx, ctx->h_MemoryError, "In %s: Out of memory", (name)); \
         {                                                                    \
             cleanup;                                                         \
         }                                                                    \
@@ -52,8 +51,7 @@ class exception : public std::exception
     }                                                                        \
     catch (const std::overflow_error &e)                                     \
     {                                                                        \
-        /* HPyErr_Format(ctx, ctx->h_OverflowError, "In %s: %s", (name), e.what());  */ \
-        HPyErr_SetString(ctx, ctx->h_OverflowError, e.what());    \
+        HPyErr_Format(ctx, ctx->h_OverflowError, "In %s: %s", (name), e.what()); \
         {                                                                    \
             cleanup;                                                         \
         }                                                                    \
@@ -62,8 +60,7 @@ class exception : public std::exception
     }                                                                        \
     catch (const std::runtime_error &e)                                      \
     {                                                                        \
-        /* HPyErr_Format(ctx, ctx->h_RuntimeError, "In %s: %s", (name), e.what());  */ \
-        HPyErr_SetString(ctx, ctx->h_RuntimeError, e.what());    \
+        HPyErr_Format(ctx, ctx->h_RuntimeError, "In %s: %s", (name), e.what()); \
         {                                                                    \
             cleanup;                                                         \
         }                                                                    \
@@ -72,8 +69,7 @@ class exception : public std::exception
     }                                                                        \
     catch (...)                                                              \
     {                                                                        \
-        /* HPyErr_Format(ctx, ctx->h_RuntimeError, "Unknown exception in %s", (name)); */ \
-        HPyErr_SetString(ctx, ctx->h_RuntimeError, name); \
+        HPyErr_Format(ctx, ctx->h_RuntimeError, "Unknown exception in %s", (name)); \
         {                                                                    \
             cleanup;                                                         \
         }                                                                    \
@@ -96,8 +92,7 @@ class exception : public std::exception
     }                                                                        \
     catch (const std::bad_alloc &)                                           \
     {                                                                        \
-        /* HPyErr_Format(ctx, ctx->h_MemoryError, "In %s: Out of memory", (name)); */ \
-        HPyErr_SetString(ctx, ctx->h_MemoryError, "In XX Out of memory");     \
+        HPyErr_Format(ctx, ctx->h_MemoryError, "In %s: Out of memory", (name)); \
         {                                                                    \
             cleanup;                                                         \
         }                                                                    \
@@ -105,8 +100,7 @@ class exception : public std::exception
     }                                                                        \
     catch (const std::overflow_error &e)                                     \
     {                                                                        \
-        /* HPyErr_Format(ctx, ctx->h_OverflowError, "In %s: %s", (name), e.what());  */ \
-        HPyErr_SetString(ctx, ctx->h_OverflowError, e.what());    \
+        HPyErr_Format(ctx, ctx->h_OverflowError, "In %s: %s", (name), e.what()); \
         {                                                                    \
             cleanup;                                                         \
         }                                                                    \
@@ -114,8 +108,7 @@ class exception : public std::exception
     }                                                                        \
     catch (const std::runtime_error &e)                                      \
     {                                                                        \
-        /* HPyErr_Format(ctx, ctx->h_RuntimeError, "In %s: %s", (name), e.what());  */ \
-        HPyErr_SetString(ctx, ctx->h_RuntimeError, e.what());    \
+        HPyErr_Format(ctx, ctx->h_RuntimeError, "In %s: %s", (name), e.what()); \
         {                                                                    \
             cleanup;                                                         \
         }                                                                    \
@@ -123,8 +116,7 @@ class exception : public std::exception
     }                                                                        \
     catch (...)                                                              \
     {                                                                        \
-        /* HPyErr_Format(ctx, ctx->h_RuntimeError, "Unknown exception in %s", (name)); */ \
-        HPyErr_SetString(ctx, ctx->h_RuntimeError, name); \
+        HPyErr_Format(ctx, ctx->h_RuntimeError, "Unknown exception in %s", (name)); \
         {                                                                    \
             cleanup;                                                         \
         }                                                                    \

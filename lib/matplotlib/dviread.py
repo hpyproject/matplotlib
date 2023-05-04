@@ -1045,7 +1045,7 @@ def find_tex_file(filename, format=None):
                   'encoding': 'utf-8'}
     else:  # On POSIX, run through the equivalent of os.fsdecode().
         kwargs = {'encoding': sys.getfilesystemencoding(),
-                  'errors': 'surrogatescape'}
+                  'errors': 'surrogateescape'}
 
     cmd = ['kpsewhich']
     if format is not None:

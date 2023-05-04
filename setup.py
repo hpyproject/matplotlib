@@ -329,7 +329,7 @@ setup(  # Finally, pass this all along to setuptools to do the heavy lifting.
 
     python_requires='>={}'.format('.'.join(str(n) for n in py_min_version)),
     setup_requires=[
-        "hpy>0.0.2",
+        "hpy>=0.9.0rc1",
         "certifi>=2020.06.20",
         "numpy>=1.17",
         "setuptools_scm>=4",
